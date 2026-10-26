@@ -3,7 +3,8 @@
   "external.libraries": [],
   "ignored.packages": [
     "rtcrcore",
-    "rtcrapp"
+    "rtcrapp",
+    "RPostgres"
   ],
   "package.dependency.fields": [
     "Imports",

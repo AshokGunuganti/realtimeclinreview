@@ -87,3 +87,50 @@ test_that("example study derivations run and line up with the visit schedule", {
   post <- mc$APOSTFL %in% "Y"
   expect_equal(mc$CHG[post], mc$MCSS[post] - mc$BASE[post])
 })
+
+test_that("example study review cycle: mark, sign off, come back after the next extract", {
+  skip_if_not(dir.exists(study), "example study not available")
+  skip_if_not_installed("RSQLite")
+  st <- yaml::read_yaml(file.path(study, "study.yml"))
+  st$review_store$path <- ":memory:"
+  con <- open_review_store(st$review_store)
+  on.exit(DBI::dbDisconnect(con))
+  m <- compile_spec(file.path(study, "mapping_spec.xlsx"))
+  sched <- utils::read.csv(file.path(study, "visit_schedule.csv"), stringsAsFactors = FALSE)
+  r <- map_extract(m, read_extract(file.path(study, "extracts", "2026-12-31"), m), sched)
+  ch <- define_checks(st$checks)
+  dv <- define_derivations(st$derivations)
+  # Two corrections arrive in November: a diary interval now breaks the missed-doses
+  # range (a new finding) and the flagged PK result is re-reported (a changed finding).
+  tb <- r$tables
+  bump <- function(t, i, field, value) {
+    v <- t[i, ]
+    v[[field]] <- value
+    v$VERSION <- v$VERSION + 1
+    v$AVAILDT <- as.POSIXct("2026-11-15", tz = "UTC")
+    rbind(t, v)
+  }
+  tb$DIARY <- bump(tb$DIARY, 1, "DOSMISS", tb$DIARY$DOSPRESC[1] + 5)
+  run <- function(d) run_checks(tb, ch, as.Date(d), r$issues, sched, st$thresholds, derivations = dv)$findings
+
+  oct <- run("2026-10-22")
+  pk_i <- match(oct$RECID[oct$CHECKID == "CL-PK-001"][1], tb$PK$RECID)
+  tb$PK <- bump(tb$PK, pk_i, "PCSTRESN", tb$PK$PCSTRESN[pk_i] + 0.2)
+  expect_gt(nrow(oct), 0)
+  for (i in seq_len(nrow(oct))) {
+    set_mark(con, st$study_id, "finding", oct$FINDINGKEY[i], "medmon", "no action", dephash = oct$DEPHASH[i],
+             subjid = oct$SUBJID[i])
+  }
+  sign_off(con, st$study_id, "medical", "2026-10-22", oct, "medmon", "Medical Monitor", "Reviewed", Sys.time())
+
+  since <- review_since(con, st$study_id, "medical")
+  expect_equal(since, as.Date("2026-10-22"))
+  dec <- compare_findings(run(since), run("2026-12-31"))
+  dec <- apply_marks(con, st$study_id, dec[dec$FINDSTAT != "Resolved", ])
+  expect_true(all(dec$REVIEW_STATUS[dec$FINDSTAT == "Persisting"] == "reviewed"))
+  expect_equal(dec$CHECKID[dec$FINDSTAT == "New"], "DM-DRY-001")
+  expect_equal(dec$REVIEW_STATUS[dec$FINDSTAT == "New"], "not reviewed")
+  expect_equal(dec$CHECKID[dec$FINDSTAT == "Changed"], "CL-PK-001")
+  expect_equal(dec$REVIEW_STATUS[dec$FINDSTAT == "Changed"], "needs re-review")
+  expect_equal(nrow(audit_trail(con, st$study_id)), nrow(oct) + 1)
+})

@@ -5,6 +5,10 @@ visit_schedule: visit_schedule.csv
 mapping_spec: mapping_spec.xlsx
 extracts: extracts
 test_sites: ["999"]
+# Review marks, sign-offs and audit trail. SQLite for demos; postgres for team use.
+review_store:
+  driver: sqlite
+  path: review_state.sqlite
 # Review thresholds (used by later steps: derivations, checks, displays)
 thresholds:
   pk_alert: 1.5          # ng/mL

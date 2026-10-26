@@ -58,7 +58,7 @@ Two packages, per `docs/design.md`:
 - [x] Mapping-spec schema and compiler; convert the prototype study to `studies/example/`
 - [x] Port checks into the registry format (ID, tier, applies-to, timing, severity, owner)
 - [x] Standard derivations with unit tests (reference-range flags and unit conversion still to do)
-- [ ] Review state (marks, sign-off, append-only audit trail)
+- [x] Review state (marks, sign-off, append-only audit trail); Postgres path written but not yet tested against a server
 - [ ] Get a dummy Medrio export to settle record keys and versioning
 
 ## License

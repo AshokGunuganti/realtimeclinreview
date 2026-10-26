@@ -227,6 +227,8 @@ Review state is the record of sponsor oversight: who reviewed what, when and wit
 - **Audit trail**, append-only: every mark, sign-off and change, with user, UTC time, old and new values. The application account can insert but never update or delete. Views and exports go to a separate access log.
 - **Queries stay in the EDC.** The framework shows query status from the EDC report and links to the record; it does not raise queries itself.
 
+**Insert-only store.** Every table is insert-only, enforced by database triggers (and, in production, by granting the application role only INSERT and SELECT). Setting, changing or clearing a mark adds a row; the current mark is the latest row per target. A mark stores the hash of the values it depends on (a finding's DEPHASH, or a record's hash of the fields the change log compares), and shows as *needs re-review* when that hash no longer matches. Saving a mark can name the mark the reviewer was looking at, so a stale screen cannot silently overwrite a colleague's mark. Sign-off stores user, printed name, UTC time, meaning and an order-independent hash of the scope (keys and hashes reviewed), and refuses a re-authentication older than five minutes; the single sign-on itself is the app's job. Comparing the findings of the last sign-off's review date with today's classifies each as New, Changed, Persisting or Resolved.
+
 **Storage.** Written through R's standard database layer (DBI). `review_store` in study.yml selects Postgres for production, with backups and database roles, or SQLite for demos only. The app and its database are the single record of review; every export shows marks read-only.
 
 ## Outputs
