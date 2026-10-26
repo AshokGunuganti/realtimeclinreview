@@ -1,0 +1,16 @@
+Package: rtcrapp
+Title: Shiny Display Modules for Real-Time Clinical Data Review
+Version: 0.0.0.9000
+Authors@R: 
+    person("Ashok", "Gunuganti", , "agunuganti@gmail.com", role = c("aut", "cre"))
+Description: Generic Shiny display modules driven by form types and study
+    configuration, presenting results computed by the core package.
+License: Apache License (>= 2)
+Config/roxygen2/version: 8.1.0
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Imports: 
+    rtcrcore
