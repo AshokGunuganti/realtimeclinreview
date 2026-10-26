@@ -1,0 +1,7 @@
+# Load app code relative to project root (tests run from tests/testthat)
+root <- normalizePath(file.path(testthat::test_path(), "..", ".."))
+old <- setwd(root)
+for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(f)
+setwd(old)
+src_dir <- file.path(root, "data", "source")
+APP_CFG$schedule_file <- file.path(root, "config", "visit_schedule.csv")

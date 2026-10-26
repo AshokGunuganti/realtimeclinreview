@@ -1,0 +1,21 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+renv/library/
+renv/staging/
+rsconnect/
+# Python
+__pycache__/
+*.pyc
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+# Never commit real study data or secrets
+studies/*/extracts/
+*.sas7bdat
+*.env
+.Renviron
+review_state*.sqlite

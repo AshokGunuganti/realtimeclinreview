@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinical Data Review Demo</title>
+<style>
+:root{
+  --bg:#fcfcfb; --card:#ffffff; --line:#e7e6e2; --grid:#ecebe7;
+  --ink:#0b0b0b; --ink2:#52514e; --ink3:#8a8983;
+  --blue:#2a78d6; --orange:#eb6834;
+  --good:#0ca30c; --warn:#fab219; --ser:#ec835a; --crit:#d03b3b;
+  --complete:#b6dcb6; --notdue:#e9e8e3; --disc:#9d9c96;
+  --seq1:#c6dcf5; --seq2:#86b4ec; --seq3:#2a78d6; --seq4:#18508f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:1.5rem;padding:0 20px;height:56px;border-bottom:1px solid var(--line);
+  background:var(--bg);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;font-weight:600;margin:0;white-space:nowrap}
+nav{display:flex;gap:.1rem;height:100%;overflow-x:auto;scrollbar-width:none}
+nav button{background:none;border:0;border-bottom:2px solid transparent;padding:0 .65rem;height:100%;
+  font:inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+header .tag{margin-left:auto;font-size:12px;color:var(--ink2);white-space:nowrap}
+.wrap{display:grid;grid-template-columns:250px 1fr;min-height:calc(100vh - 56px)}
+aside{border-right:1px solid var(--line);padding:18px 18px 24px}
+aside h6{font-size:13px;margin:0 0 .6rem;font-weight:600}
+aside label{display:block;font-size:13px;margin:.7rem 0 .3rem}
+aside input[type=date],aside select,.psel{width:100%;padding:.4rem .5rem;border:1px solid #cfcec9;border-radius:6px;font:inherit;background:#fff}
+.btn{display:block;width:100%;margin-top:.5rem;padding:.42rem;border-radius:6px;font:inherit;font-size:13px;cursor:pointer}
+.btn-p{background:var(--blue);color:#fff;border:1px solid var(--blue)}
+.btn-o{background:#fff;color:var(--ink);border:1px solid #bdbcb7}
+.btn-g{background:#eef6ee;color:#145c14;border:1px solid #9fcf9f}
+aside hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.radio{display:flex;gap:.4rem;align-items:flex-start;font-size:13px;margin:.25rem 0}
+.note{font-size:12px;color:#6b6a65}
+details summary{display:none}
+main{padding:18px 20px 40px;min-width:0}
+.banner{background:#fff4dc;border:1px solid #f2d18a;color:#5a4410;font-size:12.5px;padding:.4rem .8rem;border-radius:6px;margin-bottom:14px}
+.kpis{display:grid;gap:12px;margin-bottom:16px}
+.k6{grid-template-columns:repeat(6,1fr)} .k4{grid-template-columns:repeat(4,1fr)} .k5{grid-template-columns:repeat(5,1fr)}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 13px;min-width:0}
+.kpi.flag{border-left:4px solid var(--crit)} .kpi.warn{border-left:4px solid var(--warn)}
+.kpi .lab{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink2)}
+.kpi .val{font-size:25px;font-weight:650;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .sub{font-size:12px;color:var(--ink2)}
+.row{display:grid;gap:14px;margin-bottom:14px}
+.r84{grid-template-columns:2fr 1fr}.r66{grid-template-columns:1fr 1fr}.r48{grid-template-columns:1fr 2fr}.r75{grid-template-columns:7fr 5fr}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;min-width:0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.card h3{font-size:14px;margin:0;padding:9px 12px 9px 15px;border-bottom:1px solid var(--line);font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
+.xl{font:600 11.5px/1 inherit;font-family:inherit;color:#145c14;background:#eef6ee;border:1px solid #9fcf9f;border-radius:5px;
+  padding:5px 8px;cursor:pointer;white-space:nowrap}
+.xl:hover{background:#dcefdc}
+.card .bd{padding:12px 15px}
+.tbl{overflow:auto;max-height:430px;border:1px solid var(--grid);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{position:sticky;top:0;background:#f6f6f4;text-align:left;font-weight:600;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 9px;border-bottom:1px solid var(--grid);vertical-align:top}
+tr.sel td{background:#fdeee6}
+tbody tr:hover td{background:#f4f7fc}
+a.sid{color:var(--blue);text-decoration:none;font-weight:600;cursor:pointer;white-space:nowrap}
+a.sid:hover{text-decoration:underline}
+.b{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-crit{background:#fbe3e3;color:#8f1f1f}.b-warn{background:#fff1cf;color:#6b4a00}.b-ser{background:#fde8df;color:#8a3a17}
+.b-new{background:#e3eefb;color:#174b8f}.b-chg{background:#ecebe7;color:#3b3a37}.b-ok{background:#e4f3e4;color:#145c14}
+.att{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--grid);gap:10px}
+svg{display:block;width:100%;height:auto}
+svg text{font-family:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:.3rem 1rem;font-size:12px;color:var(--ink2);margin:2px 0 6px}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.heat{display:grid;gap:2px;font-size:10px;overflow:auto;max-height:620px}
+.heat .c{height:15px;border-radius:2px}
+.heat .rl{text-align:right;padding-right:6px;line-height:15px;white-space:nowrap}
+.heat .rl a.sid{font-weight:500;font-size:10px}
+.heat .hl{color:var(--ink2);font-size:10px;text-align:center;line-height:1.15;padding-bottom:4px;position:sticky;top:0;background:#fff}
+select.inline{padding:.35rem .5rem;border:1px solid #cfcec9;border-radius:6px;font:inherit;background:#fff;margin-bottom:6px}
+.pbar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.pbar select{max-width:220px}
+.pbar button{padding:.4rem .7rem;border:1px solid #bdbcb7;background:#fff;border-radius:6px;font:inherit;cursor:pointer}
+#tip{position:fixed;pointer-events:none;background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.1);
+  border-radius:6px;padding:6px 9px;font-size:12px;line-height:1.4;display:none;z-index:20;max-width:260px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1d1d1b;color:#fff;font-size:13px;
+  padding:8px 14px;border-radius:8px;display:none;z-index:30}
+.tab{display:none}.tab.on{display:block}
+@media (max-width:1100px){.k6{grid-template-columns:repeat(3,1fr)}.k4{grid-template-columns:repeat(2,1fr)}.k5{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr} aside{border-right:0;border-bottom:1px solid var(--line)}
+  .r84,.r66,.r48,.r75{grid-template-columns:1fr}
+  header{flex-wrap:wrap;height:auto;padding:10px 16px 0;gap:.4rem} header .tag{display:none}
+  nav{width:100%;height:42px} main{padding:14px 16px 32px}
+  aside{padding:12px 16px} .ctrls{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  details summary{display:list-item;cursor:pointer;font-weight:600;font-size:14px;padding:2px 0}
+  details[open] summary{margin-bottom:8px} aside > hr, aside > .note{display:none} .hide-m{display:none}
+  td{white-space:nowrap}
+}
+@media (max-width:520px){.k6,.k4,.k5{grid-template-columns:repeat(2,1fr)} .kpi .val{font-size:20px} .ctrls{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Phase 3 | Clinical Data Review</h1>
+  <nav id="nav">
+    <button data-t="new" class="on">What's new</button>
+    <button data-t="eff">Efficacy</button>
+    <button data-t="saf">Safety &amp; PK</button>
+    <button data-t="dq">Data quality</button>
+    <button data-t="site">Sites &amp; compliance</button>
+    <button data-t="prof">Subject profile</button>
+  </nav>
+  <span class="tag">Simulated data</span>
+</header>
+<div class="wrap">
+<aside>
+  <details id="ctl" open><summary>Controls, filters &amp; export</summary>
+  <div class="ctrls">
+    <div>
+      <h6>Data refresh</h6>
+      <div class="note">Current data cut: <b id="cutlab"></b></div>
+      <label for="since">Show changes since</label>
+      <input type="date" id="since">
+      <button class="btn btn-p" id="adv">Simulate next weekly refresh</button>
+      <button class="btn btn-o" id="rst">Reset to 22 Oct 2026</button>
+    </div>
+    <div>
+      <hr class="hide-m">
+      <h6>Filters</h6>
+      <label for="site">Site</label>
+      <select id="site"></select>
+      <label>Population</label>
+      <div class="radio"><input type="radio" name="pop" value="all" id="pa" checked><label for="pa" style="margin:0">All enrolled</label></div>
+      <div class="radio"><input type="radio" name="pop" value="itt" id="pi"><label for="pi" style="margin:0">Efficacy ITT (dosed, age 6+)</label></div>
+      <label for="alert">PK alert threshold: <b id="alertlab">1.5</b> ng/mL</label>
+      <input type="range" id="alert" min="0.5" max="2" step="0.1" value="1.5" style="width:100%">
+      <label for="cthr">Compliance flag below: <b id="cthrlab">80</b>%</label>
+      <input type="range" id="cthr" min="60" max="95" step="5" value="80" style="width:100%">
+      <hr>
+      <h6>Export</h6>
+      <button class="btn btn-g" id="xlall">Download review workbook (.xlsx)</button>
+      <p class="note" style="margin:.4rem 0 0">Every listing as its own sheet, using the current data cut and filters. Each table also has its own Excel button.</p>
+    </div>
+  </div>
+  </details>
+  <hr>
+  <p class="note">Simulated data for demonstration only, modeled on a single-arm, baseline-controlled rare-dermatology design. Not real trial data.</p>
+</aside>
+<main>
+  <div class="banner">Demo with <b>SIMULATED</b> data. Use the refresh button to step the data cut forward a week. Click any subject ID to open their profile.</div>
+
+  <section class="tab on" id="t-new">
+    <div class="kpis k6" id="k-new"></div>
+    <div class="row r84">
+      <div class="card"><h3>Changes since last refresh<button class="xl" data-x="tb-chg">Excel</button></h3><div class="bd">
+        <p class="note" style="margin:0 0 8px">Sorted by priority: SAEs, PK alerts, items needing review, then newest first.</p>
+        <div class="tbl" id="tb-chg"></div></div></div>
+      <div class="card"><h3>Needs attention now</h3><div class="bd" id="att"></div></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-eff">
+    <div class="kpis k4" id="k-eff"></div>
+    <div class="row r66">
+      <div class="card"><h3>IGA by visit: mean and 95% CI</h3><div class="bd"><div id="c-iga"></div>
+        <p class="note">7-point scale, -3 (very much worse) to +3 (very much improved). Visits with n &lt; 3 not plotted.</p></div></div>
+      <div class="card"><h3>Blinded severity score (MCSS) through run-in and treatment</h3><div class="bd">
+        <div class="legend"><span><span class="sw" style="background:#cfcec9;height:3px;vertical-align:3px"></span>Individual subjects</span>
+          <span><span class="sw" style="background:var(--blue)"></span>Mean</span>
+          <span id="hl-leg" style="display:none"><span class="sw" style="background:var(--orange)"></span><span id="hl-name"></span></span></div>
+        <div id="c-mcss"></div>
+        <p class="note">Lower is better. Shaded band = 8-week run-in; a stable run-in supports the baseline-controlled design.</p></div></div>
+    </div>
+    <div class="row r48">
+      <div class="card"><h3>IGA distribution</h3><div class="bd">
+        <select class="inline" id="igav"></select><div id="c-dist"></div></div></div>
+      <div class="card"><h3>Subject-level review<button class="xl" data-x="tb-eff">Excel</button></h3><div class="bd">
+        <p class="note" style="margin:0 0 8px">Click a row to highlight that subject in the severity plot; click the ID to open the full profile.</p>
+        <div class="tbl" id="tb-eff"></div></div></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-saf">
+    <div class="kpis k4" id="k-saf"></div>
+    <div class="row r66">
+      <div class="card"><h3>Adverse events by preferred term<button class="xl" data-x="tb-ae">Excel</button></h3><div class="bd"><div class="tbl" id="tb-ae"></div></div></div>
+      <div class="card"><h3>AE onset by study day</h3><div class="bd">
+        <div class="legend"><span><span class="sw" style="background:var(--orange);border-radius:50%"></span>Treatment-related</span>
+          <span><span class="sw" style="background:var(--blue);border-radius:50%"></span>Not related</span>
+          <span><span class="sw" style="background:var(--ink3);transform:rotate(45deg) scale(.85)"></span>Serious</span></div>
+        <div id="c-ae"></div></div></div>
+    </div>
+    <div class="row r75">
+      <div class="card"><h3>Systemic study drug trough concentrations</h3><div class="bd"><div id="c-pk"></div>
+        <p class="note">Red = 2.0 ng/mL exposure threshold; amber = alert threshold (sidebar); dotted = LLOQ 0.1 ng/mL. BLQ plotted at LLOQ/2.</p></div></div>
+      <div class="card"><h3>PK samples at or above alert threshold<button class="xl" data-x="tb-pk">Excel</button></h3><div class="bd"><div class="tbl" id="tb-pk"></div></div></div>
+    </div>
+    <div class="card"><h3>Adverse event listing<button class="xl" data-x="tb-ael">Excel</button></h3><div class="bd"><div class="tbl" id="tb-ael"></div></div></div>
+  </section>
+
+  <section class="tab" id="t-dq">
+    <div class="kpis k4" id="k-dq"></div>
+    <div class="row r75">
+      <div class="card"><h3>Visit status by subject<button class="xl" data-x="tb-vs">Excel</button></h3><div class="bd"><div class="legend" id="hleg"></div><div class="heat" id="heat"></div><div id="tb-vs" hidden></div></div></div>
+      <div class="card"><h3>Unresolved queries by site and age</h3><div class="bd">
+        <div class="legend"><span><span class="sw" style="background:var(--seq1)"></span>0-7 days</span>
+          <span><span class="sw" style="background:var(--seq2)"></span>8-14 days</span>
+          <span><span class="sw" style="background:var(--seq3)"></span>15-30 days</span>
+          <span><span class="sw" style="background:var(--seq4)"></span>&gt; 30 days</span></div>
+        <div id="c-q"></div>
+        <p class="note">Open plus answered-but-not-closed queries, by days since opened.</p></div></div>
+    </div>
+    <div class="card"><h3>Issue listing<button class="xl" data-x="tb-iss">Excel</button></h3><div class="bd"><div class="tbl" id="tb-iss"></div></div></div>
+  </section>
+
+  <section class="tab" id="t-site">
+    <div class="kpis k5" id="k-site"></div>
+    <div class="card" style="margin-bottom:14px"><h3>Site performance<button class="xl" data-x="tb-site">Excel</button></h3><div class="bd">
+      <p class="note" style="margin:0 0 8px">Entry lag = days from visit to data entered in EDC. Target: within 5 days. Sorted with the sites needing the most attention first.</p>
+      <div class="tbl" id="tb-site"></div></div></div>
+    <div class="row r66">
+      <div class="card"><h3>Median data entry lag by site</h3><div class="bd"><div id="c-lag"></div>
+        <p class="note">Dashed line = 5-day entry target. Hover for the 90th percentile.</p></div></div>
+      <div class="card"><h3>Dosing compliance by subject (latest diary interval)</h3><div class="bd">
+        <div class="legend"><span><span class="sw" style="background:var(--blue);border-radius:50%"></span>At or above threshold</span>
+          <span><span class="sw" style="background:var(--warn);border-radius:50%"></span>Below threshold</span></div>
+        <div id="c-comp"></div>
+        <p class="note">Percent of prescribed once-daily applications recorded in the dosing diary since the previous visit.</p></div></div>
+    </div>
+    <div class="card"><h3>Subjects below compliance threshold<button class="xl" data-x="tb-comp">Excel</button></h3><div class="bd"><div class="tbl" id="tb-comp"></div></div></div>
+  </section>
+
+  <section class="tab" id="t-prof">
+    <div class="pbar">
+      <button id="pprev" aria-label="Previous subject">&#8249;</button>
+      <select class="psel" id="psel"></select>
+      <button id="pnext" aria-label="Next subject">&#8250;</button>
+      <span class="note" id="pnote"></span>
+    </div>
+    <div class="kpis k5" id="k-prof"></div>
+    <div class="row r66">
+      <div class="card"><h3>Severity (MCSS) and IGA over time</h3><div class="bd"><div id="c-pm"></div>
+        <p class="note">Line = blinded MCSS (lower is better). Labels = investigator IGA at each visit.</p></div></div>
+      <div class="card"><h3>Dosing compliance by diary interval</h3><div class="bd"><div id="c-pc"></div>
+        <p class="note">Dashed line = compliance threshold (sidebar).</p></div></div>
+    </div>
+    <div class="card" style="margin-bottom:14px"><h3>Visits<button class="xl" data-x="tb-pv">Excel</button></h3><div class="bd"><div class="tbl" id="tb-pv"></div></div></div>
+    <div class="row r66">
+      <div class="card"><h3>Adverse events<button class="xl" data-x="tb-pa">Excel</button></h3><div class="bd"><div class="tbl" id="tb-pa"></div></div></div>
+      <div class="card"><h3>PK and queries<button class="xl" data-x="tb-pq">Excel</button></h3><div class="bd"><div class="tbl" id="tb-pk2"></div><div style="height:10px"></div><div class="tbl" id="tb-pq"></div></div></div>
+    </div>
+  </section>
+</main>
+</div>
+<div id="tip"></div><div id="toast"></div>
+
+<script>
+const DATA = __DATA__;
+
+// ---------- constants ----------
+const VIS = [
+  {vn:1,label:"Run-in (Wk -8)",short:"Run-in",wk:-8},{vn:2,label:"Baseline (Day 1)",short:"Day 1",wk:0},
+  {vn:3,label:"Week 4",short:"Wk 4",wk:4},{vn:4,label:"Week 8",short:"Wk 8",wk:8},{vn:5,label:"Week 12",short:"Wk 12",wk:12},
+  {vn:6,label:"Week 16",short:"Wk 16",wk:16},{vn:7,label:"Week 20",short:"Wk 20",wk:20},{vn:8,label:"Week 24",short:"Wk 24",wk:24},
+  {vn:9,label:"Week 36",short:"Wk 36",wk:36},{vn:10,label:"Week 48",short:"Wk 48",wk:48}];
+const VL = Object.fromEntries(VIS.map(v=>[v.vn,v.label]));
+const STATUS = ["Complete","Out of window","Overdue / not entered","Missed","Not yet due","Discontinued"];
+const SCOL = {"Complete":"var(--complete)","Out of window":"var(--warn)","Overdue / not entered":"var(--ser)",
+  "Missed":"var(--crit)","Not yet due":"var(--notdue)","Discontinued":"var(--disc)"};
+const LLOQ = 0.1, PKLIM = 2.0, MIN_N = 3, PKW = [4,12,24], LAG_TARGET = 5;
+const T975 = [0,12.71,4.30,3.18,2.78,2.57,2.45,2.36,2.31,2.26,2.23,2.20,2.18,2.16,2.14,2.13,2.12,2.11,2.10,2.09,2.09,2.08,2.07,2.07,2.06,2.06,2.06,2.05,2.05,2.05,2.04];
+const tq = df => df < T975.length ? T975[df] : 1.96 + 2.4/df;
+
+// ---------- dates ----------
+const D = s => s ? Math.round(Date.parse(s + "T00:00:00Z") / 864e5) : null;
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmt = (n, yr) => { if (n == null) return ""; const d = new Date(n*864e5);
+  return String(d.getUTCDate()).padStart(2,"0") + " " + MON[d.getUTCMonth()] + (yr ? " " + d.getUTCFullYear() : ""); };
+const iso = n => n == null ? "" : new Date(n*864e5).toISOString().slice(0,10);
+
+DATA.subj.forEach(s => { s.runin = D(s.runin); s.dose = D(s.dose); });
+const COMP = Object.fromEntries(DATA.comp.map(c => [c.id + "|" + c.vn, c]));
+DATA.vis.forEach(v => { v.target = D(v.target); v.vdate = D(v.vdate); v.entry = D(v.entry); v.mod = D(v.mod); v.label = VL[v.vn];
+  v.comp = COMP[v.id + "|" + v.vn] || null; });
+DATA.ae.forEach(a => { a.entry = D(a.entry); a.mod = D(a.mod); a.onset = D(a.onset); });
+DATA.pk.forEach(p => { p.sdate = D(p.sdate); p.entry = D(p.entry); p.label = "Week " + p.wk; });
+DATA.q.forEach(q => { q.opened = D(q.opened); q.answered = D(q.answered); q.closed = D(q.closed); });
+const SITE = Object.fromEntries(DATA.subj.map(s => [s.id, s.site]));
+const SUBJ = Object.fromEntries(DATA.subj.map(s => [s.id, s]));
+
+// ---------- state ----------
+const DEFAULT_CUT = D("2026-10-22");
+const S = { cut: DEFAULT_CUT, since: DEFAULT_CUT - 14, site: "All sites", pop: "all", alert: 1.5, cthr: 80,
+            hl: null, igav: 8, prof: null };
+
+// ---------- snapshot ----------
+function snapshot() {
+  const cut = S.cut;
+  let subj = DATA.subj.filter(s => s.runin <= cut);
+  if (S.site !== "All sites") subj = subj.filter(s => s.site === S.site);
+  if (S.pop === "itt") subj = subj.filter(s => s.itt);
+  const ids = new Set(subj.map(s => s.id)), sub = Object.fromEntries(subj.map(s => [s.id, s]));
+  const vis = DATA.vis.filter(v => ids.has(v.id)).map(v => {
+    const entered = !v.missed && v.entry != null && v.entry <= cut;
+    const status = entered && v.oow ? "Out of window" : entered ? "Complete"
+      : v.target + v.win >= cut ? "Not yet due" : v.missed ? "Missed" : "Overdue / not entered";
+    return {...v, entered, status, itt: sub[v.id].itt, lag: entered ? v.entry - v.vdate : null,
+      comp: entered ? v.comp : null,
+      overdue: status === "Overdue / not entered" ? cut - (v.target + v.win) : null};
+  });
+  subj.filter(s => !s.dosed).forEach(s => VIS.slice(1).forEach(v =>
+    vis.push({id:s.id, vn:v.vn, wk:v.wk, label:v.label, status:"Discontinued", entered:false, itt:false})));
+  const ae = DATA.ae.filter(a => ids.has(a.id) && a.entry <= cut).map(a => ({...a, mod: a.mod != null && a.mod <= cut ? a.mod : null}));
+  const pk = DATA.pk.filter(p => ids.has(p.id) && p.entry <= cut).map(p => ({...p, blq: p.conc < LLOQ,
+    result: p.conc < LLOQ ? "<LLOQ" : p.conc.toFixed(2)}));
+  const q = DATA.q.filter(x => ids.has(x.id) && x.opened <= cut).map(x => {
+    const status = x.closed != null && x.closed <= cut ? "Closed" : x.answered != null && x.answered <= cut ? "Answered" : "Open";
+    return {...x, status, age: status === "Closed" ? null : cut - x.opened};
+  });
+  // latest compliance per subject
+  const lastComp = {};
+  vis.filter(v => v.comp).forEach(v => { if (!lastComp[v.id] || v.vn > lastComp[v.id].vn) lastComp[v.id] = v; });
+  return {subj, vis, ae, pk, q, lastComp};
+}
+
+function changes(s) {
+  const lo = S.since, hi = S.cut, w = d => d != null && d > lo && d <= hi, out = [];
+  s.vis.filter(v => v.entered && w(v.entry)).forEach(v => {
+    const lowc = v.comp && v.comp.pct < S.cthr;
+    out.push({ch:"New", dom:"Visit", id:v.id, item:v.label,
+      det: (v.iga == null ? `Visit entered | MCSS ${v.mcss.toFixed(1)}` : `Visit entered | IGA ${v.iga>0?"+":""}${v.iga} | MCSS ${v.mcss.toFixed(1)}`) +
+           (v.comp ? ` | Dosing ${v.comp.pct}%` : ""),
+      d: v.entry, pr: v.iga != null && v.iga < 0 ? "Review" : lowc ? "Low compliance" : ""}); });
+  s.vis.filter(v => v.entered && w(v.mod) && v.entry <= lo).forEach(v => out.push({ch:"Changed", dom:"Visit", id:v.id, item:v.label,
+    det:`MCSS corrected ${v.prev.toFixed(1)} → ${v.mcss.toFixed(1)}`, d:v.mod, pr:""}));
+  s.ae.filter(a => w(a.entry)).forEach(a => out.push({ch:"New", dom:"AE", id:a.id, item:"AE #" + a.seq,
+    det:`${a.pt} | ${a.sev} | ${a.related ? "Related" : "Not related"}${a.serious ? " | SERIOUS" : ""}`, d:a.entry,
+    pr: a.serious ? "SAE" : a.sev === "Severe" ? "Review" : ""}));
+  s.ae.filter(a => w(a.mod) && a.entry <= lo).forEach(a => out.push({ch:"Changed", dom:"AE", id:a.id, item:"AE #" + a.seq,
+    det:`${a.pt} | ${a.modtext}`, d:a.mod, pr:""}));
+  s.pk.filter(p => w(p.entry)).forEach(p => out.push({ch:"New", dom:"PK", id:p.id, item:p.label,
+    det:`study drug ${p.result} ng/mL`, d:p.entry, pr: !p.blq && p.conc >= S.alert ? "PK alert" : ""}));
+  s.q.filter(x => w(x.opened)).forEach(x => out.push({ch:"New", dom:"Query", id:x.id, item:x.visit,
+    det:`${x.qid}: ${x.text}`, d:x.opened, pr:""}));
+  const rk = {"SAE":0,"PK alert":1,"Review":2,"Low compliance":3,"":4};
+  return out.sort((a,b) => rk[a.pr] - rk[b.pr] || b.d - a.d);
+}
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const BCLS = {"SAE":"b-crit","PK alert":"b-warn","Review":"b-ser","Low compliance":"b-warn","New":"b-new","Changed":"b-chg","Open":"b-ser",
+  "Answered":"b-warn","Closed":"b-ok","Missed":"b-crit","Overdue / not entered":"b-ser","Out of window":"b-warn","Complete":"b-ok",
+  "Not yet due":"b-chg","Discontinued":"b-chg","Worsening":"b-crit","Run-in instability":"b-warn","No response":"b-ser",
+  "Withdrawn":"b-chg","Ongoing":"b-new","Needs attention":"b-ser","On track":"b-ok","Watch":"b-warn"};
+const badge = x => x ? `<span class="b ${BCLS[x]||"b-new"}">${esc(x)}</span>` : "";
+const sid = id => `<a class="sid" data-sid="${id}">${id}</a>`;
+const kpi = (lab, val, sub, cls="") => `<div class="kpi ${cls}"><div class="lab">${lab}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:""}</div>`;
+const mean = a => a.reduce((x,y)=>x+y,0) / a.length;
+const median = a => { if (!a.length) return NaN; const b=[...a].sort((x,y)=>x-y), m=b.length>>1; return b.length%2 ? b[m] : (b[m-1]+b[m])/2; };
+const pctl = (a, p) => { if (!a.length) return NaN; const b=[...a].sort((x,y)=>x-y); return b[Math.min(b.length-1, Math.floor(p*(b.length-1)+.5))]; };
+const sd = a => Math.sqrt(a.reduce((s,x)=>s+(x-mean(a))**2,0)/(a.length-1));
+const sgn = v => (v > 0 ? "+" : "") + v;
+
+// table registry -> drives both the on-screen table and Excel export
+const REG = {};
+const TITLES = {"tb-chg":"Changes","tb-eff":"Efficacy by subject","tb-ae":"AE summary","tb-ael":"AE listing","tb-pk":"PK alerts",
+  "tb-vs":"Visit status","tb-iss":"Issues","tb-site":"Site performance","tb-comp":"Low compliance",
+  "tb-pv":"Subject visits","tb-pa":"Subject AEs","tb-pk2":"Subject PK","tb-pq":"Subject queries"};
+function table(el, cols, rows, opts={}) {
+  REG[el] = {cols, rows, title: opts.title || TITLES[el] || el};
+  if (opts.hidden) return;
+  if (!rows.length) { $(el).innerHTML = `<p class="note" style="padding:10px">${opts.empty||"No records."}</p>`; return; }
+  $(el).innerHTML = `<table><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join("")}</tr></thead><tbody>${
+    rows.map((r,i)=>`<tr data-i="${i}"${opts.sel&&opts.sel(r)?' class="sel"':""}>${cols.map(c=>`<td>${c[1](r)}</td>`).join("")}</tr>`).join("")
+  }</tbody></table>`;
+  if (opts.click) $(el).querySelectorAll("tbody tr").forEach(tr => { tr.style.cursor = "pointer";
+    tr.onclick = e => { if (!e.target.closest("a.sid")) opts.click(rows[+tr.dataset.i]); }; });
+}
+const empty = (el, msg) => $(el).innerHTML = `<p class="note" style="padding:30px 0;text-align:center">${msg}</p>`;
+
+// ---------- SVG chart kit ----------
+let W = 560;
+function scale(d0, d1, r0, r1) { return v => r0 + (v - d0) / (d1 - d0) * (r1 - r0); }
+function frame(h, m, xs, ys, xt, yt, xlab, ylab, xfmt = v => v, yfmt = v => v) {
+  let g = "";
+  yt.forEach(t => g += `<line x1="${m.l}" x2="${W-m.r}" y1="${ys(t)}" y2="${ys(t)}" stroke="var(--grid)"/>
+    <text x="${m.l-8}" y="${ys(t)+4}" font-size="11" text-anchor="end" fill="var(--ink2)">${yfmt(t)}</text>`);
+  xt.forEach(t => g += `<text x="${xs(t)}" y="${h-m.b+17}" font-size="11" text-anchor="middle" fill="var(--ink2)">${xfmt(t)}</text>`);
+  if (xlab) g += `<text x="${(m.l+W-m.r)/2}" y="${h-4}" font-size="12" text-anchor="middle" fill="var(--ink2)">${xlab}</text>`;
+  if (ylab) g += `<text transform="translate(13,${(m.t+h-m.b)/2}) rotate(-90)" font-size="12" text-anchor="middle" fill="var(--ink2)">${ylab}</text>`;
+  return g;
+}
+const tipAttr = t => `data-tip="${esc(t)}"`;
+const svg = (h, body) => `<svg viewBox="0 0 ${W} ${h}" role="img">${body}</svg>`;
+const withW = (w, f) => { const o = W; W = w; try { return f(); } finally { W = o; } };
+const hline = (m, ys, y, col, dash, w, lab) => `<line x1="${m.l}" x2="${W-m.r}" y1="${ys(y)}" y2="${ys(y)}" stroke="${col}" stroke-width="${w}" stroke-dasharray="${dash}"/>` +
+  (lab ? `<text x="${W-m.r}" y="${ys(y)-4}" font-size="10" text-anchor="end" fill="var(--ink2)">${lab}</text>` : "");
+
+// ---------- What's new ----------
+function renderNew(s) {
+  const c = changes(s), nsae = c.filter(x=>x.pr==="SAE").length, npk = c.filter(x=>x.pr==="PK alert").length;
+  $("k-new").innerHTML =
+    kpi("Enrolled", s.subj.length, `${s.subj.filter(x=>x.dosed).length} dosed`) +
+    kpi("New visits", c.filter(x=>x.dom==="Visit"&&x.ch==="New").length, `since ${fmt(S.since)}`) +
+    kpi("New AEs", c.filter(x=>x.dom==="AE"&&x.ch==="New").length, `${nsae} serious`, nsae?"flag":"") +
+    kpi("Changed records", c.filter(x=>x.ch==="Changed").length, "edits to existing data") +
+    kpi("New PK results", c.filter(x=>x.dom==="PK").length, `${npk} at/above alert`, npk?"warn":"") +
+    kpi("New queries", c.filter(x=>x.dom==="Query").length, `${s.q.filter(x=>x.status==="Open").length} open overall`);
+  table("tb-chg", [["Change",r=>badge(r.ch)],["Domain",r=>r.dom],["Subject",r=>sid(r.id)],["Site",r=>SITE[r.id]],
+    ["Item",r=>esc(r.item)],["Detail",r=>esc(r.det)],["Date",r=>fmt(r.d,true)],["Priority",r=>badge(r.pr)]], c,
+    {empty:"No changes in this window."});
+  const latest = {};
+  s.vis.filter(v=>v.entered && v.iga!=null).forEach(v => { if (!latest[v.id] || v.vn > latest[v.id].vn) latest[v.id] = v; });
+  const lagSites = siteRows(s).filter(r => r.lag > LAG_TARGET).length;
+  const items = [
+    [nsae, "New serious AEs this refresh", "b-crit", "saf"],
+    [s.pk.filter(p=>!p.blq && p.conc>=S.alert).length, `PK samples ≥ ${S.alert.toFixed(1)} ng/mL (all-time)`, "b-warn", "saf"],
+    [Object.values(latest).filter(v=>v.iga<0).length, "Subjects with IGA below 0 (latest visit)", "b-ser", "eff"],
+    [Object.values(s.lastComp).filter(v=>v.comp.pct < S.cthr).length, `Subjects with dosing compliance < ${S.cthr}% (latest)`, "b-warn", "site"],
+    [s.vis.filter(v=>v.status==="Overdue / not entered" && v.overdue>14).length, "Visits overdue > 14 days", "b-ser", "dq"],
+    [s.q.filter(x=>x.status==="Open" && x.age>30).length, "Queries open > 30 days", "b-ser", "dq"],
+    [lagSites, `Sites with median entry lag > ${LAG_TARGET} days`, "b-ser", "site"]];
+  $("att").innerHTML = items.map(([n,l,cls,t]) => `<div class="att"><a class="sid" style="font-weight:500;white-space:normal;color:var(--ink)" data-go="${t}">${l}</a><span class="b ${n?cls:"b-chg"}">${n}</span></div>`).join("") +
+    `<p class="note" style="margin-top:10px">Click an item to jump to its tab. In production this panel drives the weekly data review agenda.</p>`;
+}
+
+// ---------- Efficacy ----------
+function renderEff(s) {
+  const e = s.vis.filter(v => v.entered && v.itt), w24 = e.filter(v=>v.wk===24);
+  const byId = {}; e.forEach(v => (byId[v.id] = byId[v.id] || {})[v.wk] = v);
+  const drift = Object.values(byId).filter(o=>o[-8]&&o[0]).map(o=>Math.abs(o[0].mcss-o[-8].mcss));
+  $("k-eff").innerHTML =
+    kpi("ITT subjects with data", new Set(e.map(v=>v.id)).size) +
+    kpi("Reached Week 24", w24.length) +
+    kpi("Week 24 mean IGA", w24.length ? (mean(w24.map(v=>v.iga))>=0?"+":"") + mean(w24.map(v=>v.iga)).toFixed(2) : "–",
+        w24.length ? `${Math.round(100*w24.filter(v=>v.iga>=2).length/w24.length)}% much/very much improved` : "") +
+    kpi("Run-in drift (median)", drift.length ? median(drift).toFixed(1) : "–", "|MCSS change|, Wk -8 to Day 1");
+
+  const pts = VIS.filter(v=>v.wk>0).map(v => { const a = e.filter(x=>x.wk===v.wk).map(x=>x.iga);
+    if (a.length < MIN_N) return null; const m = mean(a), h = tq(a.length-1)*sd(a)/Math.sqrt(a.length);
+    return {wk:v.wk, label:v.label, n:a.length, m, lo:m-h, hi:m+h}; }).filter(Boolean);
+  if (!pts.length) empty("c-iga", "No post-baseline IGA data yet."); else {
+    const h = 300, m = {l:44,r:16,t:22,b:42}, xs = scale(2, Math.max(...pts.map(p=>p.wk)) + 2, m.l, W-m.r), ys = scale(-1, 3.5, h-m.b, m.t);
+    let g = frame(h, m, xs, ys, pts.map(p=>p.wk), [-1,0,1,2,3], "Study week", "Mean IGA");
+    g += `<line x1="${m.l}" x2="${W-m.r}" y1="${ys(0)}" y2="${ys(0)}" stroke="var(--ink3)"/>`;
+    g += `<polyline fill="none" stroke="var(--blue)" stroke-width="2" points="${pts.map(p=>`${xs(p.wk)},${ys(p.m)}`).join(" ")}"/>`;
+    pts.forEach(p => { const x = xs(p.wk);
+      g += `<line x1="${x}" x2="${x}" y1="${ys(p.lo)}" y2="${ys(p.hi)}" stroke="var(--blue)" stroke-width="1.3"/>
+        <line x1="${x-4}" x2="${x+4}" y1="${ys(p.lo)}" y2="${ys(p.lo)}" stroke="var(--blue)"/><line x1="${x-4}" x2="${x+4}" y1="${ys(p.hi)}" y2="${ys(p.hi)}" stroke="var(--blue)"/>
+        <text x="${x}" y="${ys(p.hi)-7}" font-size="10" text-anchor="middle" fill="var(--ink3)">n=${p.n}</text>
+        <circle cx="${x}" cy="${ys(p.m)}" r="5" fill="var(--blue)" stroke="#fff" stroke-width="2"/>
+        <circle cx="${x}" cy="${ys(p.m)}" r="14" fill="transparent" ${tipAttr(`<b>${p.label}</b><br>Mean ${p.m>=0?"+":""}${p.m.toFixed(2)} (95% CI ${p.lo.toFixed(2)} to ${p.hi.toFixed(2)})<br>n = ${p.n}`)}/>`; });
+    $("c-iga").innerHTML = svg(h, g);
+  }
+
+  if (!e.length) empty("c-mcss", "No efficacy data yet."); else {
+    const h = 300, m = {l:44,r:16,t:22,b:42}, xs = scale(-10, 50, m.l, W-m.r), ys = scale(0, 20, h-m.b, m.t);
+    let g = `<rect x="${xs(-8)}" y="${m.t}" width="${xs(0)-xs(-8)}" height="${h-m.b-m.t}" fill="rgba(42,120,214,.07)"/>`;
+    g += frame(h, m, xs, ys, VIS.map(v=>v.wk), [0,5,10,15,20], "Study week", "MCSS (blinded)");
+    g += `<line x1="${xs(0)}" x2="${xs(0)}" y1="${m.t}" y2="${h-m.b}" stroke="var(--ink3)" stroke-dasharray="3 3"/>
+      <text x="${xs(-4)}" y="${m.t-6}" font-size="10" text-anchor="middle" fill="var(--ink2)">Run-in</text>
+      <text x="${xs(0)+4}" y="${m.t-6}" font-size="10" fill="var(--ink2)">First dose</text>`;
+    Object.entries(byId).forEach(([id,o]) => { const p = Object.values(o).sort((a,b)=>a.wk-b.wk);
+      g += `<polyline fill="none" stroke="rgba(138,137,131,.3)" stroke-width="1" points="${p.map(v=>`${xs(v.wk)},${ys(v.mcss)}`).join(" ")}"/>`; });
+    const mn = VIS.map(v => { const a = e.filter(x=>x.wk===v.wk).map(x=>x.mcss); return a.length>=MIN_N ? {wk:v.wk,label:v.label,m:mean(a),n:a.length} : null; }).filter(Boolean);
+    g += `<polyline fill="none" stroke="var(--blue)" stroke-width="2.5" points="${mn.map(p=>`${xs(p.wk)},${ys(p.m)}`).join(" ")}"/>`;
+    mn.forEach(p => g += `<circle cx="${xs(p.wk)}" cy="${ys(p.m)}" r="5" fill="var(--blue)" stroke="#fff" stroke-width="2"/>
+      <circle cx="${xs(p.wk)}" cy="${ys(p.m)}" r="13" fill="transparent" ${tipAttr(`<b>${p.label}</b><br>Mean MCSS ${p.m.toFixed(1)} (n=${p.n})`)}/>`);
+    if (S.hl && byId[S.hl]) { const p = Object.values(byId[S.hl]).sort((a,b)=>a.wk-b.wk);
+      g += `<polyline fill="none" stroke="var(--orange)" stroke-width="2.5" points="${p.map(v=>`${xs(v.wk)},${ys(v.mcss)}`).join(" ")}"/>`;
+      p.forEach(v => g += `<circle cx="${xs(v.wk)}" cy="${ys(v.mcss)}" r="5" fill="var(--orange)" stroke="#fff" stroke-width="2" ${tipAttr(`<b>${S.hl}</b><br>${v.label}<br>MCSS ${v.mcss.toFixed(1)}${v.iga!=null?` | IGA ${sgn(v.iga)}`:""}`)}/>`); }
+    $("hl-leg").style.display = S.hl ? "" : "none"; $("hl-name").textContent = S.hl || "";
+    $("c-mcss").innerHTML = svg(h, g);
+  }
+
+  withW(330, () => {
+    const at = e.filter(v=>v.vn===S.igav), cnt = [-3,-2,-1,0,1,2,3].map(k=>({k, n:at.filter(v=>v.iga===k).length}));
+    if (!at.length) { empty("c-dist", "No data at this visit yet."); return; }
+    const h = 260, m = {l:36,r:10,t:16,b:42}, mx = Math.max(...cnt.map(c=>c.n)), top = Math.max(4, Math.ceil(mx/2)*2);
+    const bw = (W-m.l-m.r)/7, ys = scale(0, top, h-m.b, m.t);
+    let g = frame(h, m, i=>m.l+bw*(i+3.5), ys, [-3,-2,-1,0,1,2,3], [0, top/2, top], "IGA score", "Subjects", v=>v>0?"+"+v:v);
+    const lab = {"-3":"Very much worse","0":"No change","3":"Very much improved"};
+    cnt.forEach((c,i) => { if (!c.n) return; const x = m.l + bw*i + 6, y = ys(c.n);
+      g += `<rect x="${x}" y="${y}" width="${bw-12}" height="${h-m.b-y}" rx="3" fill="var(--blue)" ${tipAttr(`<b>IGA ${sgn(c.k)}</b>${lab[c.k]?" ("+lab[c.k]+")":""}<br>${c.n} subjects (${Math.round(100*c.n/at.length)}%)`)}/>
+        <text x="${x+(bw-12)/2}" y="${y-5}" font-size="11" text-anchor="middle" fill="var(--ink2)">${c.n}</text>`; });
+    $("c-dist").innerHTML = svg(h, g);
+  });
+
+  const rows = Object.entries(byId).map(([id,o]) => {
+    const post = Object.values(o).filter(v=>v.wk>0).sort((a,b)=>b.wk-a.wk); if (!post.length) return null;
+    const L = post[0], base = o[0]?.mcss, ri = o[-8]?.mcss, pchg = base ? Math.round(100*(L.mcss-base)/base) : null;
+    const flag = L.iga < 0 ? "Worsening" : (base!=null && ri!=null && Math.abs(base-ri) > 3) ? "Run-in instability" : L.iga <= 0 ? "No response" : "";
+    return {id, site:SITE[id], latest:L.label, iga:L.iga, ri, base, mcss:L.mcss, pchg, flag, comp: s.lastComp[id]?.comp.pct};
+  }).filter(Boolean).sort((a,b) => (b.flag?1:0)-(a.flag?1:0) || a.pchg-b.pchg);
+  const f1 = v => v==null ? "–" : v.toFixed(1);
+  table("tb-eff", [["Subject",r=>sid(r.id)],["Site",r=>r.site],["Latest visit",r=>r.latest],["IGA",r=>sgn(r.iga)],
+    ["MCSS run-in",r=>f1(r.ri)],["MCSS baseline",r=>f1(r.base)],["MCSS latest",r=>f1(r.mcss)],["% change",r=>r.pchg],
+    ["Dosing %",r=>r.comp ?? "–"],["Flag",r=>badge(r.flag)]],
+    rows, {sel:r=>r.id===S.hl, click:r=>{ S.hl = S.hl===r.id ? null : r.id; renderEff(snapshot()); }, empty:"No post-baseline data yet."});
+}
+
+// ---------- Safety & PK ----------
+function renderSaf(s) {
+  const a = s.ae, dosed = s.subj.filter(x=>x.dosed).length, pk = s.pk;
+  const uniq = arr => new Set(arr).size, maxpk = pk.length ? Math.max(...pk.map(p=>p.conc)) : null;
+  $("k-saf").innerHTML =
+    kpi("Subjects with any AE", `${uniq(a.map(x=>x.id))} / ${dosed}`, `${a.length} events`) +
+    kpi("Treatment-related AEs", a.filter(x=>x.related).length, `${uniq(a.filter(x=>x.related).map(x=>x.id))} subjects`) +
+    kpi("Serious AEs", a.filter(x=>x.serious).length, `${a.filter(x=>x.serious&&x.related).length} related`, a.some(x=>x.serious)?"flag":"") +
+    kpi("Max systemic study drug", maxpk!=null ? maxpk.toFixed(2)+" <span style='font-size:14px'>ng/mL</span>" : "–",
+        `${pk.length} samples, ${pk.filter(p=>p.blq).length} BLQ`, maxpk!=null && maxpk>=S.alert ? "warn":"");
+
+  const SEV = ["Mild","Moderate","Severe"], g = {};
+  a.forEach(x => { const r = g[x.pt] = g[x.pt] || {pt:x.pt, ids:new Set(), ev:0, rel:0, ser:0, sev:0};
+    r.ids.add(x.id); r.ev++; r.rel += x.related; r.ser += x.serious; r.sev = Math.max(r.sev, SEV.indexOf(x.sev)); });
+  const rows = Object.values(g).sort((x,y)=>y.ids.size-x.ids.size || y.ev-x.ev);
+  table("tb-ae", [["Preferred term",r=>r.pt],["Subjects",r=>r.ids.size],["% subj",r=>(100*r.ids.size/Math.max(dosed,1)).toFixed(1)],
+    ["Events",r=>r.ev],["Related",r=>r.rel],["Serious",r=>r.ser],["Max severity",r=>SEV[r.sev]]], rows, {empty:"No AEs reported yet."});
+
+  const al = [...a].sort((x,y)=>(y.serious-x.serious) || x.id.localeCompare(y.id) || x.seq-y.seq);
+  table("tb-ael", [["Subject",r=>sid(r.id)],["Site",r=>SITE[r.id]],["AE #",r=>r.seq],["Preferred term",r=>r.pt],["Onset",r=>fmt(r.onset,true)],
+    ["Study day",r=>r.day],["Severity",r=>r.sev],["Related",r=>r.related?"Yes":"No"],["Serious",r=>r.serious?badge("SAE"):"No"],
+    ["Last update",r=>r.mod?`${esc(r.modtext)} (${fmt(r.mod)})`:"–"]], al, {empty:"No AEs reported yet."});
+
+  if (!a.length) empty("c-ae", "No AEs reported yet."); else {
+    const ids = [...new Set(a.map(x=>x.id))].sort(), rh = 15, m = {l:62,r:14,t:10,b:42}, h = m.t+m.b+rh*ids.length;
+    const mxd = Math.max(...a.map(x=>x.day)), top = Math.ceil(mxd/50)*50, xs = scale(0, top, m.l, W-m.r);
+    let gg = "";
+    ids.forEach((id,i) => { const y = m.t + rh*i + rh/2;
+      gg += `<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y+3}" font-size="9.5" text-anchor="end" fill="var(--ink2)">${id}</text>`; });
+    for (let t = 0; t <= top; t += 50) gg += `<text x="${xs(t)}" y="${h-m.b+16}" font-size="11" text-anchor="middle" fill="var(--ink2)">${t}</text>`;
+    gg += `<text x="${(m.l+W-m.r)/2}" y="${h-6}" font-size="12" text-anchor="middle" fill="var(--ink2)">Study day of onset</text>`;
+    a.forEach(x => { const y = m.t + rh*ids.indexOf(x.id) + rh/2, cx = xs(x.day), col = x.related ? "var(--orange)" : "var(--blue)";
+      const t = tipAttr(`<b>${x.id}</b><br>${x.pt}<br>Day ${x.day} | ${x.sev} | ${x.related?"Related":"Not related"}${x.serious?"<br><b style='color:var(--crit)'>SERIOUS</b>":""}`);
+      gg += x.serious ? `<rect x="${cx-6}" y="${y-6}" width="12" height="12" transform="rotate(45 ${cx} ${y})" fill="${col}" stroke="var(--crit)" stroke-width="2" ${t}/>`
+                      : `<circle cx="${cx}" cy="${y}" r="5" fill="${col}" stroke="#fff" stroke-width="1.5" ${t}/>`; });
+    $("c-ae").innerHTML = svg(h, gg);
+  }
+
+  if (!pk.length) empty("c-pk", "No PK results yet."); else {
+    const h = 300, m = {l:44,r:16,t:16,b:30}, xs = scale(0.5, 3.5, m.l, W-m.r), ys = scale(0, 2.3, h-m.b, m.t);
+    let gg = frame(h, m, xs, ys, [], [0,0.5,1,1.5,2], null, "study drug (ng/mL)");
+    PKW.forEach((w,i) => gg += `<text x="${xs(i+1)}" y="${h-m.b+18}" font-size="11" text-anchor="middle" fill="var(--ink2)">Week ${w}</text>`);
+    gg += hline(m, ys, PKLIM, "var(--crit)", "6 4", 2, "Threshold 2.0") + hline(m, ys, S.alert, "var(--warn)", "6 4", 1.5, "Alert " + S.alert.toFixed(1)) + hline(m, ys, LLOQ, "var(--ink3)", "2 3", 1, "");
+    let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+    pk.forEach(p => { const flag = !p.blq && p.conc >= S.alert, cx = xs(PKW.indexOf(p.wk)+1 + (rnd()-.5)*.36), cy = ys(p.blq ? LLOQ/2 : p.conc);
+      gg += `<circle cx="${cx}" cy="${cy}" r="${flag?7:4.5}" fill="${flag?"var(--warn)":"var(--blue)"}" stroke="#fff" stroke-width="1.5" ${tipAttr(`<b>${p.id}</b><br>${p.label}<br>study drug ${p.result} ng/mL`)}/>`; });
+    $("c-pk").innerHTML = svg(h, gg);
+  }
+  const alr = pk.filter(p=>!p.blq && p.conc>=S.alert).sort((x,y)=>y.conc-x.conc);
+  table("tb-pk", [["Subject",r=>sid(r.id)],["Site",r=>SITE[r.id]],["Visit",r=>r.label],["Sample date",r=>fmt(r.sdate,true)],
+    ["ng/mL",r=>esc(r.result)],["% of threshold",r=>Math.round(100*r.conc/PKLIM)]], alr, {empty:`No samples at or above ${S.alert.toFixed(1)} ng/mL.`});
+}
+
+// ---------- Data quality ----------
+function renderDQ(s) {
+  const v = s.vis.filter(x=>x.status!=="Not yet due" && x.status!=="Discontinued"), open = s.q.filter(x=>x.status!=="Closed");
+  const n = st => v.filter(x=>x.status===st).length, ages = open.map(x=>x.age);
+  $("k-dq").innerHTML =
+    kpi("Visits complete in window", v.length ? Math.round(100*n("Complete")/v.length)+"%" : "–", `${n("Complete")} of ${v.length} due`) +
+    kpi("Overdue / not entered", n("Overdue / not entered"), `${n("Missed")} missed`, n("Overdue / not entered")?"warn":"") +
+    kpi("Unresolved queries", open.length, `${open.filter(x=>x.status==="Open").length} open, ${open.filter(x=>x.status==="Answered").length} answered`) +
+    kpi("Median query age", open.length ? Math.round(median(ages))+" days" : "–", `${ages.filter(x=>x>30).length} older than 30 days`);
+
+  $("hleg").innerHTML = STATUS.map(st=>`<span><span class="sw" style="background:${SCOL[st]}"></span>${st}</span>`).join("");
+  const ids = [...new Set(s.vis.map(x=>x.id))].sort(), map = {};
+  s.vis.forEach(x => map[x.id + "|" + x.vn] = x);
+  let html = `<div></div>` + VIS.map(x=>`<div class="hl">${x.short}</div>`).join("");
+  ids.forEach(id => { html += `<div class="rl">${sid(id)}</div>`;
+    VIS.forEach(vv => { const x = map[id+"|"+vv.vn];
+      if (!x) { html += `<div class="c"></div>`; return; }
+      const extra = x.overdue != null ? ` (${x.overdue} days)` : x.status==="Out of window" ? ` (${sgn(x.off)} days)` : "";
+      html += `<div class="c" style="background:${SCOL[x.status]}" ${tipAttr(`<b>${id}</b><br>${vv.label}<br>${x.status}${extra}`)}></div>`; }); });
+  $("heat").style.gridTemplateColumns = `56px repeat(${VIS.length}, minmax(22px,1fr))`;
+  $("heat").innerHTML = ids.length ? html : `<p class="note">No subjects.</p>`;
+  // visit status grid as an exportable table (hidden on screen)
+  table("tb-vs", [["Subject",r=>r.id],["Site",r=>SITE[r.id]], ...VIS.map(vv=>[vv.label, r=>map[r.id+"|"+vv.vn]?.status ?? ""])],
+    ids.map(id=>({id})), {hidden:true});
+
+  withW(400, () => {
+    if (!open.length) { empty("c-q", "No unresolved queries."); return; }
+    const B = [[0,7],[8,14],[15,30],[31,1e9]], COLS = ["var(--seq1)","var(--seq2)","var(--seq3)","var(--seq4)"], LAB = ["0-7 days","8-14 days","15-30 days","> 30 days"];
+    const sites = {}; open.forEach(x => { const s0 = SITE[x.id], r = sites[s0] = sites[s0] || [0,0,0,0];
+      r[B.findIndex(b=>x.age>=b[0]&&x.age<=b[1])]++; });
+    const rows = Object.entries(sites).sort((a,b)=>b[1].reduce((x,y)=>x+y)-a[1].reduce((x,y)=>x+y));
+    const rh = 30, m = {l:44,r:20,t:8,b:40}, h = m.t+m.b+rh*rows.length, mx = Math.max(...rows.map(r=>r[1].reduce((x,y)=>x+y)));
+    const xs = scale(0, mx, m.l, W-m.r);
+    let g = "";
+    for (let t = 0; t <= mx; t++) g += `<line x1="${xs(t)}" x2="${xs(t)}" y1="${m.t}" y2="${h-m.b}" stroke="var(--grid)"/><text x="${xs(t)}" y="${h-m.b+16}" font-size="11" text-anchor="middle" fill="var(--ink2)">${t}</text>`;
+    g += `<text x="${(m.l+W-m.r)/2}" y="${h-6}" font-size="12" text-anchor="middle" fill="var(--ink2)">Unresolved queries</text>`;
+    rows.forEach(([site,c],i) => { const y = m.t + rh*i + 4; let x0 = 0;
+      g += `<text x="${m.l-8}" y="${y+15}" font-size="11" text-anchor="end" fill="var(--ink2)">${site}</text>`;
+      c.forEach((k,j) => { if (!k) return; const x = xs(x0), w = xs(x0+k)-x;
+        g += `<rect x="${x+1}" y="${y}" width="${Math.max(w-2,1)}" height="${rh-8}" rx="3" fill="${COLS[j]}" ${tipAttr(`<b>Site ${site}</b><br>${LAB[j]}: ${k}`)}/>`; x0 += k; }); });
+    $("c-q").innerHTML = svg(h, g);
+  });
+
+  const iss = [
+    ...s.vis.filter(x=>["Overdue / not entered","Missed","Out of window"].includes(x.status)).map(x=>({type:x.status, id:x.id, item:x.label,
+      det: x.status==="Out of window" ? `Visit ${sgn(x.off)} days from target (window ±${x.win})` : x.status==="Missed" ? "Visit not performed" : `Due ${fmt(x.target)}; nothing entered`,
+      days: x.overdue || 0})),
+    ...open.map(x=>({type:x.status, id:x.id, item:`${x.qid} | ${x.visit}`, det:x.text, days:x.age}))].sort((a,b)=>b.days-a.days);
+  table("tb-iss", [["Type",r=>badge(r.type)],["Subject",r=>sid(r.id)],["Site",r=>SITE[r.id]],["Item",r=>esc(r.item)],["Detail",r=>esc(r.det)],["Days",r=>r.days]],
+    iss, {empty:"No open issues."});
+}
+
+// ---------- Sites & compliance ----------
+function siteRows(s) {
+  const sites = [...new Set(s.subj.map(x=>x.site))].sort();
+  return sites.map(site => {
+    const subs = s.subj.filter(x=>x.site===site), ids = new Set(subs.map(x=>x.id));
+    const v = s.vis.filter(x=>ids.has(x.id) && x.status!=="Not yet due" && x.status!=="Discontinued");
+    const lags = v.filter(x=>x.lag!=null).map(x=>x.lag);
+    const q = s.q.filter(x=>ids.has(x.id)), open = q.filter(x=>x.status!=="Closed");
+    const comps = Object.values(s.lastComp).filter(x=>ids.has(x.id)).map(x=>x.comp.pct);
+    const r = { site, enrolled: subs.length, dosed: subs.filter(x=>x.dosed).length, due: v.length,
+      inwin: v.length ? Math.round(100*v.filter(x=>x.status==="Complete").length/v.length) : null,
+      overdue: v.filter(x=>x.status==="Overdue / not entered").length, missed: v.filter(x=>x.status==="Missed").length,
+      lag: lags.length ? median(lags) : null, lag90: lags.length ? pctl(lags,.9) : null,
+      within5: lags.length ? Math.round(100*lags.filter(x=>x<=LAG_TARGET).length/lags.length) : null,
+      qrate: v.length ? +(10*q.length/v.length).toFixed(1) : null, open: open.length,
+      comp: comps.length ? Math.round(mean(comps)) : null, lowc: comps.filter(x=>x<S.cthr).length };
+    let score = 0;
+    if (r.lag != null && r.lag > LAG_TARGET) score += 2; if (r.overdue) score += 2; if (r.missed) score += 1;
+    if (r.open >= 3) score += 1; if (r.lowc) score += 1; if (r.inwin != null && r.inwin < 85) score += 1;
+    r.score = score; r.status = score >= 3 ? "Needs attention" : score >= 1 ? "Watch" : "On track";
+    return r;
+  }).sort((a,b)=>b.score-a.score || a.site.localeCompare(b.site));
+}
+
+function renderSite(s) {
+  const rows = siteRows(s), dosed = s.subj.filter(x=>x.dosed).length;
+  const lags = s.vis.filter(x=>x.lag!=null).map(x=>x.lag), lc = Object.values(s.lastComp), low = lc.filter(x=>x.comp.pct < S.cthr);
+  $("k-site").innerHTML =
+    kpi("Active sites", rows.length, `${rows.filter(r=>r.status==="Needs attention").length} need attention`, rows.some(r=>r.status==="Needs attention")?"warn":"") +
+    kpi("Median entry lag", lags.length ? median(lags)+" days" : "–", `target ≤ ${LAG_TARGET} days`) +
+    kpi("Entered within target", lags.length ? Math.round(100*lags.filter(x=>x<=LAG_TARGET).length/lags.length)+"%" : "–", `${lags.length} visits entered`) +
+    kpi("Mean dosing compliance", lc.length ? Math.round(mean(lc.map(x=>x.comp.pct)))+"%" : "–", `latest interval, ${lc.length} of ${dosed} dosed`) +
+    kpi(`Below ${S.cthr}% compliance`, low.length, "subjects, latest interval", low.length?"warn":"");
+
+  const n0 = v => v==null ? "–" : v;
+  table("tb-site", [["Site",r=>r.site],["Status",r=>badge(r.status)],["Enrolled",r=>r.enrolled],["Dosed",r=>r.dosed],["Visits due",r=>r.due],
+    ["% complete in window",r=>n0(r.inwin)],["Overdue",r=>r.overdue],["Missed",r=>r.missed],["Median entry lag (d)",r=>n0(r.lag)],
+    ["% entered ≤ 5 d",r=>n0(r.within5)],["Queries / 10 visits",r=>n0(r.qrate)],["Unresolved queries",r=>r.open],
+    ["Mean dosing %",r=>n0(r.comp)],[`Subjects < ${S.cthr}%`,r=>r.lowc]], rows, {empty:"No sites."});
+
+  // entry lag chart
+  const lr = rows.filter(r=>r.lag!=null).sort((a,b)=>b.lag-a.lag);
+  if (!lr.length) empty("c-lag", "No visits entered yet."); else {
+    const rh = 26, m = {l:44,r:24,t:10,b:40}, h = m.t+m.b+rh*lr.length, mx = Math.max(LAG_TARGET+2, ...lr.map(r=>r.lag));
+    const xs = scale(0, Math.ceil(mx), m.l, W-m.r);
+    let g = "";
+    for (let t = 0; t <= Math.ceil(mx); t += (mx > 12 ? 5 : 2)) g += `<line x1="${xs(t)}" x2="${xs(t)}" y1="${m.t}" y2="${h-m.b}" stroke="var(--grid)"/><text x="${xs(t)}" y="${h-m.b+16}" font-size="11" text-anchor="middle" fill="var(--ink2)">${t}</text>`;
+    g += `<text x="${(m.l+W-m.r)/2}" y="${h-6}" font-size="12" text-anchor="middle" fill="var(--ink2)">Median days from visit to EDC entry</text>`;
+    lr.forEach((r,i) => { const y = m.t + rh*i + 4, over = r.lag > LAG_TARGET;
+      g += `<text x="${m.l-8}" y="${y+13}" font-size="11" text-anchor="end" fill="var(--ink2)">${r.site}</text>
+        <rect x="${m.l}" y="${y}" width="${Math.max(xs(r.lag)-m.l,2)}" height="${rh-8}" rx="3" fill="${over?"var(--ser)":"var(--blue)"}"
+          ${tipAttr(`<b>Site ${r.site}</b><br>Median lag ${r.lag} days<br>90th percentile ${r.lag90} days<br>${r.within5}% entered within ${LAG_TARGET} days`)}/>
+        <text x="${xs(r.lag)+5}" y="${y+13}" font-size="10.5" fill="var(--ink2)">${r.lag}</text>`; });
+    g += `<line x1="${xs(LAG_TARGET)}" x2="${xs(LAG_TARGET)}" y1="${m.t}" y2="${h-m.b}" stroke="var(--crit)" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+    $("c-lag").innerHTML = svg(h, g);
+  }
+
+  // compliance strip by site
+  const sites = [...new Set(lc.map(x=>SITE[x.id]))].sort();
+  if (!lc.length) empty("c-comp", "No diary data yet."); else {
+    const rh = 26, m = {l:44,r:16,t:10,b:40}, h = m.t+m.b+rh*sites.length, xs = scale(40, 100, m.l, W-m.r);
+    let g = "";
+    [40,50,60,70,80,90,100].forEach(t => g += `<line x1="${xs(t)}" x2="${xs(t)}" y1="${m.t}" y2="${h-m.b}" stroke="var(--grid)"/><text x="${xs(t)}" y="${h-m.b+16}" font-size="11" text-anchor="middle" fill="var(--ink2)">${t}%</text>`);
+    g += `<text x="${(m.l+W-m.r)/2}" y="${h-6}" font-size="12" text-anchor="middle" fill="var(--ink2)">Diary compliance, latest interval</text>`;
+    g += `<line x1="${xs(S.cthr)}" x2="${xs(S.cthr)}" y1="${m.t}" y2="${h-m.b}" stroke="var(--warn)" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+    sites.forEach((st,i) => { const y = m.t + rh*i + rh/2;
+      g += `<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${m.l-8}" y="${y+4}" font-size="11" text-anchor="end" fill="var(--ink2)">${st}</text>`;
+      lc.filter(x=>SITE[x.id]===st).forEach((x,j) => { const low = x.comp.pct < S.cthr;
+        g += `<circle cx="${xs(Math.max(40,x.comp.pct))}" cy="${y + ((j%3)-1)*4}" r="${low?6.5:5}" fill="${low?"var(--warn)":"var(--blue)"}" stroke="#fff" stroke-width="1.5" data-sid="${x.id}" style="cursor:pointer"
+          ${tipAttr(`<b>${x.id}</b><br>${x.comp.pct}% through ${x.label}<br>${x.comp.md} of ${x.comp.days} doses missed<br><i>Click for profile</i>`)}/>`; }); });
+    $("c-comp").innerHTML = svg(h, g);
+  }
+
+  const lowRows = s.subj.filter(x=>x.dosed).map(x => {
+    const iv = s.vis.filter(v=>v.id===x.id && v.comp).sort((a,b)=>a.vn-b.vn); if (!iv.length) return null;
+    const last = iv[iv.length-1]; if (last.comp.pct >= S.cthr) return null;
+    return {id:x.id, site:x.site, visit:last.label, pct:last.comp.pct, md:last.comp.md, days:last.comp.days,
+      overall: Math.round(mean(iv.map(v=>v.comp.pct))), trend: iv.length > 1 ? last.comp.pct - iv[iv.length-2].comp.pct : null};
+  }).filter(Boolean).sort((a,b)=>a.pct-b.pct);
+  table("tb-comp", [["Subject",r=>sid(r.id)],["Site",r=>r.site],["Through visit",r=>r.visit],["Latest %",r=>r.pct],
+    ["Doses missed",r=>`${r.md} of ${r.days}`],["Mean % all intervals",r=>r.overall],["Change vs prior",r=>r.trend==null?"–":sgn(r.trend)]],
+    lowRows, {empty:`No subjects below ${S.cthr}% in their latest interval.`});
+}
+
+// ---------- Subject profile ----------
+function renderProf(s) {
+  const ids = s.subj.map(x=>x.id).sort();
+  if (!ids.length) { $("k-prof").innerHTML = ""; $("psel").innerHTML = ""; return; }
+  if (!S.prof || !ids.includes(S.prof)) S.prof = ids[0];
+  $("psel").innerHTML = ids.map(id=>`<option${id===S.prof?" selected":""}>${id}</option>`).join("");
+  const id = S.prof, sj = SUBJ[id], vis = s.vis.filter(v=>v.id===id).sort((a,b)=>a.vn-b.vn);
+  const ent = vis.filter(v=>v.entered), ae = s.ae.filter(a=>a.id===id), pk = s.pk.filter(p=>p.id===id), q = s.q.filter(x=>x.id===id);
+  const base = ent.find(v=>v.wk===0), last = [...ent].reverse().find(v=>v.wk>0), comps = ent.filter(v=>v.comp);
+  const status = !sj.dosed ? "Withdrawn" : "Ongoing";
+  $("pnote").innerHTML = `${badge(status)} <span style="margin-left:6px">${ids.indexOf(id)+1} of ${ids.length} subjects in current filter</span>`;
+  const pchg = base && last ? Math.round(100*(last.mcss-base.mcss)/base.mcss) : null;
+  $("k-prof").innerHTML =
+    kpi("Site / age / sex", `${sj.site}`, `${sj.age} y, ${sj.sex === "F" ? "female" : "male"}${sj.itt ? "" : " | not in efficacy ITT"}`) +
+    kpi("First dose", sj.dose ? fmt(sj.dose, true) : "Not dosed", sj.dose ? `Study day ${S.cut - sj.dose + 1} at data cut` : "withdrew during run-in") +
+    kpi("Latest IGA", last ? sgn(last.iga) : "–", last ? `${last.label}; MCSS ${pchg}% vs baseline` : "no post-baseline visit yet", last && last.iga < 0 ? "flag" : "") +
+    kpi("Dosing compliance", comps.length ? Math.round(mean(comps.map(v=>v.comp.pct)))+"%" : "–",
+        comps.length ? `latest ${comps[comps.length-1].comp.pct}%` : "no diary data yet", comps.length && comps[comps.length-1].comp.pct < S.cthr ? "warn" : "") +
+    kpi("AEs / open queries", `${ae.length} / ${q.filter(x=>x.status!=="Closed").length}`,
+        `${ae.filter(a=>a.serious).length} serious, ${ae.filter(a=>a.related).length} related`, ae.some(a=>a.serious) ? "flag" : "");
+
+  // MCSS line with IGA labels
+  if (!ent.length) empty("c-pm", "No assessments entered yet."); else {
+    const h = 280, m = {l:44,r:16,t:30,b:42}, xs = scale(-10, 50, m.l, W-m.r), ys = scale(0, 20, h-m.b, m.t);
+    let g = `<rect x="${xs(-8)}" y="${m.t}" width="${xs(0)-xs(-8)}" height="${h-m.b-m.t}" fill="rgba(42,120,214,.07)"/>`;
+    g += frame(h, m, xs, ys, VIS.map(v=>v.wk), [0,5,10,15,20], "Study week", "MCSS (blinded)");
+    g += `<line x1="${xs(0)}" x2="${xs(0)}" y1="${m.t}" y2="${h-m.b}" stroke="var(--ink3)" stroke-dasharray="3 3"/>`;
+    if (base) g += hline(m, ys, base.mcss, "var(--ink3)", "2 3", 1, "Baseline");
+    g += `<polyline fill="none" stroke="var(--blue)" stroke-width="2.5" points="${ent.map(v=>`${xs(v.wk)},${ys(v.mcss)}`).join(" ")}"/>`;
+    ent.forEach(v => { g += `<circle cx="${xs(v.wk)}" cy="${ys(v.mcss)}" r="5.5" fill="var(--blue)" stroke="#fff" stroke-width="2"
+        ${tipAttr(`<b>${v.label}</b> (${fmt(v.vdate,true)})<br>MCSS ${v.mcss.toFixed(1)}${v.iga!=null?`<br>IGA ${sgn(v.iga)}`:""}${v.comp?`<br>Dosing ${v.comp.pct}%`:""}`)}/>`;
+      if (v.iga != null) g += `<text x="${xs(v.wk)}" y="${ys(v.mcss)-11}" font-size="10.5" font-weight="600" text-anchor="middle" fill="${v.iga<0?"var(--crit)":"var(--ink2)"}">${sgn(v.iga)}</text>`; });
+    $("c-pm").innerHTML = svg(h, g);
+  }
+
+  // compliance bars
+  if (!comps.length) empty("c-pc", "No diary intervals reconciled yet."); else {
+    const h = 280, m = {l:44,r:16,t:20,b:42}, bw = (W-m.l-m.r)/Math.max(comps.length, 4), ys = scale(0, 100, h-m.b, m.t);
+    let g = frame(h, m, i=>m.l+bw*(i+.5), ys, comps.map((_,i)=>i), [0,25,50,75,100], "Diary interval ending at visit", "Doses recorded (%)",
+      i => comps[i].label.replace("Week ","Wk "), v => v);
+    comps.forEach((v,i) => { const low = v.comp.pct < S.cthr, x = m.l + bw*i + 8, y = ys(v.comp.pct);
+      g += `<rect x="${x}" y="${y}" width="${bw-16}" height="${h-m.b-y}" rx="3" fill="${low?"var(--warn)":"var(--blue)"}"
+        ${tipAttr(`<b>${v.label}</b><br>${v.comp.pct}% of ${v.comp.days} days<br>${v.comp.md} doses missed`)}/>
+        <text x="${x+(bw-16)/2}" y="${y-5}" font-size="10.5" text-anchor="middle" fill="var(--ink2)">${v.comp.pct}</text>`; });
+    g += hline(m, ys, S.cthr, "var(--warn)", "5 4", 1.5, `${S.cthr}%`);
+    $("c-pc").innerHTML = svg(h, g);
+  }
+
+  table("tb-pv", [["Visit",r=>r.label],["Target",r=>fmt(r.target,true)],["Actual",r=>r.vdate&&r.entered?fmt(r.vdate,true):"–"],
+    ["Status",r=>badge(r.status)],["Entry lag (d)",r=>r.lag ?? "–"],["MCSS",r=>r.entered&&r.mcss!=null?r.mcss.toFixed(1):"–"],
+    ["IGA",r=>r.entered&&r.iga!=null?sgn(r.iga):"–"],["Dosing %",r=>r.comp?r.comp.pct:"–"],["Doses missed",r=>r.comp?`${r.comp.md} of ${r.comp.days}`:"–"]],
+    vis, {title:`${id} visits`});
+  table("tb-pa", [["AE #",r=>r.seq],["Preferred term",r=>r.pt],["Onset",r=>fmt(r.onset,true)],["Day",r=>r.day],["Severity",r=>r.sev],
+    ["Related",r=>r.related?"Yes":"No"],["Serious",r=>r.serious?badge("SAE"):"No"]], ae, {empty:"No AEs reported.", title:`${id} AEs`});
+  table("tb-pk2", [["PK visit",r=>r.label],["Sample date",r=>fmt(r.sdate,true)],["study drug ng/mL",r=>esc(r.result)],
+    ["% of threshold",r=>r.blq?"–":Math.round(100*r.conc/PKLIM)]], pk, {empty:"No PK results yet.", title:`${id} PK`});
+  table("tb-pq", [["Query",r=>r.qid],["Item",r=>esc(r.visit)],["Text",r=>esc(r.text)],["Opened",r=>fmt(r.opened,true)],["Status",r=>badge(r.status)],
+    ["Age (d)",r=>r.age ?? "–"]], q, {empty:"No queries.", title:`${id} queries`});
+}
+
+// ---------- render all ----------
+let SNAP = null;
+function render() {
+  const s = SNAP = snapshot();
+  $("cutlab").textContent = fmt(S.cut, true);
+  $("since").value = iso(S.since); $("since").max = iso(S.cut - 1);
+  if (S.hl && !s.subj.some(x=>x.id===S.hl)) S.hl = null;
+  renderNew(s); renderEff(s); renderSaf(s); renderDQ(s); renderSite(s); renderProf(s);
+}
+
+// ---------- minimal XLSX writer (no libraries) ----------
+const CRC = (()=>{ const t = new Uint32Array(256); for (let n=0;n<256;n++){ let c=n; for (let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i=0;i<b.length;i++) c = CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; };
+function zipBlob(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  const u16 = v => [v&255,(v>>>8)&255], u32 = v => [v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];
+  files.forEach(f => { const nm = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data), sz = data.length;
+    const lh = new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(sz),...u32(sz),...u16(nm.length),...u16(0)]);
+    parts.push(lh, nm, data);
+    central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(sz),...u32(sz),
+      ...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]), nm);
+    off += lh.length + nm.length + sz; });
+  const cs = central.reduce((a,b)=>a+b.length,0);
+  const end = new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cs),...u32(off),...u16(0)]);
+  return new Blob([...parts, ...central, end], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+const xesc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"");
+const colL = i => { let s = ""; i++; while (i) { const r = (i-1)%26; s = String.fromCharCode(65+r) + s; i = (i-1-r)/26; } return s; };
+const plain = html => { const d = document.createElement("div"); d.innerHTML = html; return d.textContent; };
+function sheetXML(header, rows) {
+  const widths = header.map((h,j) => Math.min(60, Math.max(8, String(h).length + 2, ...rows.slice(0,300).map(r => String(r[j]).length + 2))));
+  const cell = (v, r, c, st) => { const ref = colL(c) + (r+1);
+    if (typeof v === "number" && isFinite(v)) return `<c r="${ref}"${st?` s="${st}"`:""}><v>${v}</v></c>`;
+    return `<c r="${ref}" t="inlineStr"${st?` s="${st}"`:""}><is><t xml:space="preserve">${xesc(v)}</t></is></c>`; };
+  const data = [header, ...rows].map((row,r) => `<row r="${r+1}">${row.map((v,c)=>cell(v,r,c,r===0?1:0)).join("")}</row>`).join("");
+  const last = colL(header.length-1) + (rows.length+1);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
+    `<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols>` +
+    `<sheetData>${data}</sheetData>${rows.length ? `<autoFilter ref="A1:${last}"/>` : ""}</worksheet>`;
+}
+function workbook(sheets) {   // sheets: [{name, header, rows}]
+  const used = new Set(), names = sheets.map(s => { let n = s.name.replace(/[\[\]:*?\/\\]/g,"-").slice(0,31), k = 2, b = n;
+    while (used.has(n.toLowerCase())) n = b.slice(0,28) + " " + k++; used.add(n.toLowerCase()); return n; });
+  const files = [
+    {name:"[Content_Types].xml", text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`},
+    {name:"_rels/.rels", text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+    {name:"xl/workbook.xml", text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${names.map((n,i)=>`<sheet name="${xesc(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")}</sheets></workbook>`},
+    {name:"xl/_rels/workbook.xml.rels", text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+    {name:"xl/styles.xml", text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EEFB"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},
+    ...sheets.map((s,i) => ({name:`xl/worksheets/sheet${i+1}.xml`, text: sheetXML(s.header, s.rows)}))];
+  return zipBlob(files);
+}
+function regSheet(key) {
+  const R = REG[key]; if (!R) return null;
+  const header = R.cols.map(c => plain(c[0]));
+  const rows = R.rows.map(r => R.cols.map(c => { const t = plain(c[1](r)).trim(); return t !== "" && t !== "–" && /^-?\d+(\.\d+)?$/.test(t) ? +t : (t === "–" ? "" : t); }));
+  return {name: R.title, header, rows};
+}
+function aboutSheet() {
+  return {name:"About", header:["Item","Value"], rows:[
+    ["Report","Phase 3 clinical data review"],["Data", "SIMULATED data for demonstration only. Not real trial data."],
+    ["Data cut", fmt(S.cut,true)],["Changes since", fmt(S.since,true)],["Site filter", S.site],
+    ["Population", S.pop==="itt" ? "Efficacy ITT (dosed, age 6+)" : "All enrolled"],
+    ["PK alert threshold (ng/mL)", S.alert],["Compliance flag threshold (%)", S.cthr],["Generated", new Date().toLocaleString()]]};
+}
+function download(blob, name) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  toast(`Downloaded ${name}`);
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(()=>t.style.display="none", 2200); }
+const stamp = () => iso(S.cut).replace(/-/g,"");
+const ORDER = ["tb-chg","tb-iss","tb-site","tb-comp","tb-eff","tb-ae","tb-ael","tb-pk","tb-vs"];
+$("xlall").onclick = () => download(workbook([aboutSheet(), ...ORDER.map(regSheet).filter(Boolean)]), `data_review_${stamp()}.xlsx`);
+document.addEventListener("click", e => { const b = e.target.closest("button.xl"); if (!b) return;
+  let keys = [b.dataset.x]; if (b.dataset.x === "tb-pq") keys = ["tb-pk2","tb-pq"];
+  const sheets = keys.map(regSheet).filter(Boolean), base = (REG[keys[0]]?.title || "listing").replace(/[^\w]+/g,"_");
+  download(workbook([aboutSheet(), ...sheets]), `${base}_${stamp()}.xlsx`); });
+
+// ---------- controls ----------
+const sites = [...new Set(DATA.subj.map(s=>s.site))].sort();
+$("site").innerHTML = ["All sites", ...sites].map(x=>`<option>${x}</option>`).join("");
+$("igav").innerHTML = VIS.slice(2).map(v=>`<option value="${v.vn}"${v.vn===8?" selected":""}>${v.label}</option>`).join("");
+$("site").onchange = e => { S.site = e.target.value; render(); };
+document.querySelectorAll("input[name=pop]").forEach(r => r.onchange = e => { S.pop = e.target.value; render(); });
+$("alert").oninput = e => { S.alert = +e.target.value; $("alertlab").textContent = S.alert.toFixed(1); render(); };
+$("cthr").oninput = e => { S.cthr = +e.target.value; $("cthrlab").textContent = S.cthr; render(); };
+$("since").onchange = e => { const d = D(e.target.value); if (d != null) S.since = Math.min(d, S.cut - 1); render(); };
+$("adv").onclick = () => { S.since = S.cut; S.cut += 7; render(); toast(`Data cut moved to ${fmt(S.cut,true)}`); };
+$("rst").onclick = () => { S.cut = DEFAULT_CUT; S.since = DEFAULT_CUT - 14; render(); };
+$("igav").onchange = e => { S.igav = +e.target.value; renderEff(SNAP); };
+$("psel").onchange = e => { S.prof = e.target.value; renderProf(SNAP); };
+const step = d => { const ids = SNAP.subj.map(x=>x.id).sort(), i = ids.indexOf(S.prof); S.prof = ids[(i + d + ids.length) % ids.length]; renderProf(SNAP); };
+$("pprev").onclick = () => step(-1); $("pnext").onclick = () => step(1);
+function goTab(t) {
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on", x.dataset.t===t));
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on", x.id==="t-"+t));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("#nav button").forEach(b => b.onclick = () => goTab(b.dataset.t));
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-go]"); if (g) { goTab(g.dataset.go); return; }
+  const a = e.target.closest("[data-sid]"); if (a) { S.prof = a.dataset.sid; renderProf(SNAP); goTab("prof"); $("tip").style.display = "none"; }
+});
+
+// ---------- tooltip ----------
+const tip = $("tip");
+function showTip(e, el) { tip.innerHTML = el.getAttribute("data-tip"); tip.style.display = "block";
+  const r = tip.getBoundingClientRect(), x = e.clientX + 14, y = e.clientY + 14;
+  tip.style.left = Math.min(x, innerWidth - r.width - 8) + "px"; tip.style.top = Math.min(y, innerHeight - r.height - 8) + "px"; }
+document.addEventListener("mousemove", e => { const el = e.target.closest("[data-tip]"); el ? showTip(e, el) : tip.style.display = "none"; });
+document.addEventListener("click", e => { const el = e.target.closest("[data-tip]"); if (el && !el.hasAttribute("data-sid")) showTip(e, el); else if (!e.target.closest("#tip")) tip.style.display = "none"; });
+
+if (innerWidth <= 900) $("ctl").open = false;
+render();
+</script>
+</body>
+</html>
