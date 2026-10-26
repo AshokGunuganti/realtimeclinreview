@@ -124,6 +124,7 @@ derivations:
       dates:
         - {name: ENRLDT, from: [{form: DM, field: ENRLDAT}]}
         - {name: TRTSDT, from: [{form: EX, field: EXSTDAT}]}
+        - {name: PLANDY1, offset: 56, from: [{form: DM, field: ENRLDAT}]}   # planned Day 1 after 8-week run-in
         - {name: LSTCNTDT, pick: last, from: [{form: SV, field: VISDAT}, {form: MCSS, field: PHOTODT}]}
   - id: STATUS
     type: subject_status
@@ -178,3 +179,45 @@ derivations:
       field: AESEV
       order: [MILD, MODERATE, SEVERE]
       when: [{field: TRTEMFL, op: "==", value: "Y"}]
+
+# Review app
+app:
+  review_type: medical        # sign-off type that sets the default "changes since" date
+  simulated: true
+displays:
+  - {id: new, module: whats_new, title: "What's new", params: {priority: [AE, PK, MCSS]}}
+  - id: visits
+    module: visit_grid
+    title: Visit status
+    params:
+      form: SV
+      date: VISDAT
+      not_done: {field: VISND, value: "Yes"}
+      fallback: {TRTSDT: PLANDY1}
+  - id: mcss
+    module: over_time
+    title: mCSS over time (central read)
+    params: {form: MCSS, value: MCSS, shade: [1], min_n: 3, y_label: mCSS total}
+  - id: mcss-chg
+    module: over_time
+    title: mCSS change from baseline
+    params: {form: MCSS, value: CHG, min_n: 3, y_label: Change from baseline}
+  - id: iga
+    module: over_time
+    title: IGA over time
+    params: {form: IGA, value: IGASCORE, min_n: 3, y_label: IGA (change score)}
+  - id: ae-timeline
+    module: timeline
+    title: Adverse events
+    params: {form: AE, day: ASTDY, label: AETERM, color: AESEV}
+  - {id: ae, module: listing, title: AE listing, params: {form: AE}}
+  - {id: pk, module: listing, title: PK listing, params: {form: PK}}
+  - {id: diary, module: listing, title: Dosing diary, params: {form: DIARY}}
+  - {id: checks, module: check_results, title: Checks}
+  - id: profile
+    module: subject_profile
+    title: Subject profile
+    params:
+      timeline:
+        - {form: SV, day: ADY, label: FOLDER}
+        - {form: AE, day: ASTDY, label: AETERM}

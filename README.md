@@ -21,6 +21,15 @@ Shiny app and an Excel workbook, with every screen reproducible "as of" any revi
 | `demo/data_review_demo.html` | Self-contained offline HTML demo (open in a browser) |
 | `demo/single_file_app.R` | Original single-file Shiny mockup |
 
+## Run the review app (example study)
+
+```r
+renv::install(c("./core", "./app"))
+rtcrapp::run_app("studies/example")     # screens come from study.yml `displays`
+```
+
+Deep links: `?tab=<display id>` opens a screen, `?subject=<id>` opens the subject profile.
+
 ## Development setup
 
 From the repository root (renv activates automatically via `.Rprofile`):
@@ -59,6 +68,8 @@ Two packages, per `docs/design.md`:
 - [x] Port checks into the registry format (ID, tier, applies-to, timing, severity, owner)
 - [x] Standard derivations with unit tests (reference-range flags and unit conversion still to do)
 - [x] Review state (marks, sign-off, append-only audit trail); Postgres path written but not yet tested against a server
+- [x] App package: shell and display modules (what's new, visit status grid, over-time chart, event timeline, listing, check results, subject profile) with review marks and Excel export
+- [ ] Remaining displays: site scorecard, coding review, lock readiness; sign-off screen (needs SSO re-authentication); role filtering
 - [ ] Get a dummy Medrio export to settle record keys and versioning
 
 ## License

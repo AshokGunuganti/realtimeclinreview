@@ -16,6 +16,7 @@ dv_reference_dates <- function(state, p) {
                  SRC = paste0(s$form, ":", t$RECID), stringsAsFactors = FALSE)
     }))
     cand <- cand[!is.na(cand$D), , drop = FALSE]
+    if (!is.null(d$offset)) cand$D <- cand$D + as.numeric(d$offset)   # e.g. planned Day 1 = enrollment + 56
     cand <- cand[order(cand$SUBJID, if (pick == "last") -as.numeric(cand$D) else as.numeric(cand$D)), , drop = FALSE]
     cand <- cand[!duplicated(cand$SUBJID), , drop = FALSE]
     m <- match(ids, cand$SUBJID)

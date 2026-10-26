@@ -214,6 +214,8 @@ Screens are built from generic Shiny modules that work off form types, configure
 | Coding review | Coded log forms | Verbatim term against coded term, with consistency across subjects |
 | Lock readiness | All forms | Per subject and form: open queries, missing data, PI signature, SDV, freeze and lock status |
 
+**Configuration.** study.yml `displays` lists the screens in order: each has an `id`, a `module`, a `title` and module `params` (for example `visit_grid` takes the visit form, its date field, the not-done flag and a fallback anchor such as planned Day 1 for subjects not yet dosed). The core supplies everything a screen computes (`review_data()` per review date, `visit_status()`), so the app only presents. Screens accept deep links: `?tab=<id>` and `?subject=<id>`.
+
 **Example configuration** for an over-time chart: parameter = IGA from the IGA form, x = nominal week, shade the run-in, show mean and 95% CI, minimum n = 3.
 
 A study that needs something genuinely specific registers a **plug-in module** in its study folder, using the same contract. Every module shares the same building blocks: subject links that open the profile, a review-mark column and an Excel button.

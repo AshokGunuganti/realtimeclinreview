@@ -6,7 +6,7 @@
 \alias{rtcrapp-package}
 \title{rtcrapp: Shiny Display Modules for Real-Time Clinical Data Review}
 \description{
-Generic Shiny display modules driven by form types and study configuration, presenting results computed by the core package.
+Generic Shiny display modules driven by form types and study configuration (study.yml displays), presenting results computed by the core package: what changed, visit status, over-time charts, timelines, listings, check results and subject profiles, with review marks and Excel export.
 }
 \author{
 \strong{Maintainer}: Ashok Gunuganti \email{agunuganti@gmail.com}

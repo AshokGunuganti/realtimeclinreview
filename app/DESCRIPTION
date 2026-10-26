@@ -3,14 +3,22 @@ Title: Shiny Display Modules for Real-Time Clinical Data Review
 Version: 0.0.0.9000
 Authors@R: 
     person("Ashok", "Gunuganti", , "agunuganti@gmail.com", role = c("aut", "cre"))
-Description: Generic Shiny display modules driven by form types and study
-    configuration, presenting results computed by the core package.
+Description: Generic Shiny display modules driven by form types and study configuration (study.yml displays), presenting results computed by the core package: what changed, visit status, over-time charts, timelines, listings, check results and subject profiles, with review marks and Excel export.
 License: Apache License (>= 2)
-Config/roxygen2/version: 8.1.0
+Config/roxygen2/version: 8.1.1
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests: 
-    testthat (>= 3.0.0)
+    RSQLite,
+    testthat (>= 3.0.0),
+    withr
 Config/testthat/edition: 3
 Imports: 
-    rtcrcore
+    bslib,
+    DBI,
+    DT,
+    htmltools,
+    openxlsx,
+    plotly,
+    rtcrcore,
+    shiny
