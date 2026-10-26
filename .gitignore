@@ -19,3 +19,7 @@ studies/*/extracts/
 *.env
 .Renviron
 review_state*.sqlite
+# ...except the simulated example study
+!studies/example/extracts/
+# Compiled from mapping_spec.xlsx by the pipeline; never edited by hand
+studies/*/mapping.yml

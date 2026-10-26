@@ -91,6 +91,8 @@ studies/<study>/
 
 **Mapping spec.** Data managers and programmers author it in Excel; the pipeline compiles it to YAML and validates it against a schema before running. Each row: target form, target variable, source, source field(s), transform, transform arguments, required flag, notes.
 
+**Spec layout.** Three sheets. *Forms*: FORMOID, form type, source file, record key (source fields), versioning (`single`: one row per key; `rows`: several rows per key are successive versions, such as vendor corrections, ordered by AVAILDT) and description. *Mapping*: one row per target variable in output order; arguments are written `name=value; name=value`; `filter` and `pivot` rows reshape the source before any field is mapped and leave the variable blank. *Codelists*: codelist, code, decode. FORMOID, RECID (key fields joined with `|`) and VERSION are filled by the mapper, never by the spec. Values a transform cannot use go to the parse log with form, variable, source row and subject; rows with no AVAILDT are dropped and logged.
+
 **Transform vocabulary.** Deliberately small, so the spec stays readable and every transform is unit-tested once. A spec check warns when a study leans on derive for more than a configured share of fields, a sign the library is missing a transform:
 
 | Transform | Does | Example argument |

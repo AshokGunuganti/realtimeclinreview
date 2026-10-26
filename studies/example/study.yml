@@ -1,0 +1,15 @@
+# Example study: SIMULATED single-arm rare-dermatology trial (no real data).
+schema_version: 1
+study_id: DERM-301-SIM
+visit_schedule: visit_schedule.csv
+mapping_spec: mapping_spec.xlsx
+extracts: extracts
+test_sites: ["999"]
+# Review thresholds (used by later steps: derivations, checks, displays)
+thresholds:
+  pk_alert: 1.5          # ng/mL
+  pk_limit: 2.0          # ng/mL systemic exposure threshold
+  lloq: 0.1              # ng/mL
+  compliance: 80         # %
+  entry_lag_target: 5    # days
+  min_n: 3

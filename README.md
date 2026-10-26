@@ -14,6 +14,7 @@ Shiny app and an Excel workbook, with every screen reproducible "as of" any revi
 | `docs/design.md` | Framework design: data model, as-of engine, derivations, check and display libraries, review state, outputs, pipeline, validation, roadmap |
 | `core/` | Core package `rtcrcore` (working name): everything that decides what a reviewer sees. Validated once |
 | `app/` | App package `rtcrapp` (working name): Shiny display modules that present core results |
+| `studies/example/` | Example study (simulated): `study.yml`, visit schedule, `mapping_spec.xlsx`, one extract |
 | `renv.lock` | Pinned R package versions for the whole repository |
 | `prototype/` | Working modular Shiny app on a simulated single-arm rare-dermatology study (113 passing tests). Source of the patterns the packages will generalize |
 | `prototype/specs/Review_Data_Spec.xlsx` | Example mapping specification (sources → review datasets, derivations, checks, traceability) |
@@ -54,7 +55,7 @@ Two packages, per `docs/design.md`:
 
 - [x] Scaffold `core/` and `app/` packages (usethis, testthat, renv)
 - [x] Port standard header + as-of engine from `prototype/R/snapshot.R`
-- [ ] Mapping-spec schema and compiler; convert the prototype study to `studies/example/`
+- [x] Mapping-spec schema and compiler; convert the prototype study to `studies/example/`
 - [ ] Port checks into the registry format (ID, tier, applies-to, timing, severity, owner)
 - [ ] Standard derivations with unit tests
 - [ ] Review state (marks, sign-off, append-only audit trail)
