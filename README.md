@@ -53,7 +53,7 @@ Two packages, per `docs/design.md`:
 ### Next steps
 
 - [x] Scaffold `core/` and `app/` packages (usethis, testthat, renv)
-- [ ] Port standard header + as-of engine from `prototype/R/snapshot.R`
+- [x] Port standard header + as-of engine from `prototype/R/snapshot.R`
 - [ ] Mapping-spec schema and compiler; convert the prototype study to `studies/example/`
 - [ ] Port checks into the registry format (ID, tier, applies-to, timing, severity, owner)
 - [ ] Standard derivations with unit tests

@@ -58,6 +58,7 @@ The collected data model (CDM) is the single source of truth: one table per eCRF
 | UPDDT | Date last changed | 2026-10-24 |
 | AVAILDT | Date and time (UTC) this version became available, with an extract sequence number for same-day runs | 2026-10-24 |
 | VERSION | Version of the record, 1 = original | 2 |
+| DELFL | Optional. TRUE on a version that records a deletion (a tombstone); tables without it have no deletions | FALSE |
 
 `FORMOID + RECID + VERSION` is unique. After the header come the collected fields under CDASH names (`AETERM, AESTDAT, AESEV`). Coded fields keep both the code and its decode, and dates are converted to ISO 8601. Any field the reviewer needs from the source is kept, even if it has no SDTM home.
 
@@ -129,7 +130,8 @@ The exports are dropped into a secure folder on a schedule and read from there. 
 The as-of engine reconstructs what the data looked like on any review date D, using only the standard header. That makes it generic: it never needs to know what a form contains.
 
 - **Snapshot(D):** for each record, the highest VERSION with AVAILDT on or before D. Records first available after D are hidden.
-- **Change log(since, D):** compares Snapshot(since) with Snapshot(D) and classifies every record as **New** (first version in the window), **Changed** (a later version in the window, with old and new values of each changed field), **Deleted** (the form was extracted in full but the record is absent; a missing or truncated file never produces Deleted) or **Unchanged**.
+- **Change log(since, D):** compares Snapshot(since) with Snapshot(D) and classifies every record as **New** (first version in the window), **Changed** (a later version in the window, with old and new values of each changed field), **Deleted** (the form was extracted in full but the record is absent; a missing or truncated file never produces Deleted) or **Unchanged**. A later version whose compared fields are all equal (for example only UPDDT moved) counts as Unchanged, so review marks are not reset needlessly; compared fields are every column except RECID, VERSION, AVAILDT, ENTRYDT, UPDDT and DELFL. A record created and deleted inside the window is not reported.
+- **Deletions:** a deletion is stored as a new version with DELFL = TRUE, never by removing rows, so the record can still be shown as it stood on earlier dates. The pipeline writes one only when the rule above holds. Snapshot(D) hides a record whose current version is a deletion.
 - **Derived status:** visit status, query status, days overdue and similar values are computed against D, never stored.
 
 In production D is the latest extract; for investigations D can be any past date, to replay what reviewers saw. "Since" defaults to the reviewer's last sign-off for that review type, or the previous extract if none, so every "new" count is defined. The statuses New, Changed, Deleted and Unchanged feed every output: the app's "what's new" screen, row flags in the Excel workbook, and the reset of review marks. Snapshots and derivations for each extract are computed by the pipeline and cached; only ad-hoc replay dates are computed on the fly.
