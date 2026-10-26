@@ -184,12 +184,13 @@ derivations:
 app:
   review_type: medical        # sign-off type that sets the default "changes since" date
   simulated: true
+  queries: QUERY              # query report: query status on listings, site scorecard and lock readiness
 displays:
   - {id: new, module: whats_new, title: "What's new", params: {priority: [AE, PK, MCSS]}}
   - id: visits
     module: visit_grid
     title: Visit status
-    params:
+    params: &visits
       form: SV
       date: VISDAT
       not_done: {field: VISND, value: "Yes"}
@@ -214,6 +215,12 @@ displays:
   - {id: pk, module: listing, title: PK listing, params: {form: PK}}
   - {id: diary, module: listing, title: Dosing diary, params: {form: DIARY}}
   - {id: checks, module: check_results, title: Checks}
+  - {id: sites, module: site_scorecard, title: Site scorecard, params: {visits: *visits, query_age: 30}}
+  - id: coding
+    module: coding_review
+    title: AE coding
+    params: {form: AE, verbatim: AETERM, coded: AEDECOD, soc: AESOC, version: MEDDRAV, date: AECODDT}
+  - {id: lock, module: lock_readiness, title: Lock readiness, params: {form_status: FSTAT}}
   - id: profile
     module: subject_profile
     title: Subject profile

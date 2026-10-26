@@ -65,5 +65,5 @@ profile_server <- function(id, ctx, params) {
 }
 
 profile_forms <- function(params, study) {
-  if (length(params$forms)) unlist(params$forms) else names(study$tables)
+  if (length(params$forms)) unlist(params$forms) else clinical_forms(study)
 }

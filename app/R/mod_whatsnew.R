@@ -19,7 +19,7 @@ whatsnew_server <- function(id, ctx, params) {
       asof <- ctx$asof()
       since <- ctx$since()
       site <- ctx$site()
-      out <- lapply(names(ctx$study$tables), function(f) {
+      out <- lapply(clinical_forms(ctx$study), function(f) {
         cl <- rtcrcore::change_log(ctx$study$tables[[f]], since, asof)
         cl <- cl[cl$RECSTAT != "Unchanged", , drop = FALSE]
         if (!identical(site, "All sites")) cl <- cl[cl$SITEID %in% site, , drop = FALSE]

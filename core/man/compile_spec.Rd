@@ -23,7 +23,8 @@ with \code{\link[=validate_mapping]{validate_mapping()}}, and optionally writes 
 \details{
 Spec layout:
 \itemize{
-\item \strong{Forms}: \code{FORMOID}, \code{FORMTYPE} (subject, visit, log or vendor),
+\item \strong{Forms}: \code{FORMOID}, \code{FORMTYPE} (subject, visit, log, vendor, or
+report for operational EDC reports such as queries and form status),
 \code{SOURCE} (file name in the extract), \code{KEY} (comma-separated source fields
 that identify a record), \code{VERSIONING} (\code{single}: one row per key;
 \code{rows}: several rows per key are successive versions, such as vendor

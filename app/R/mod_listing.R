@@ -1,5 +1,5 @@
 # Listing: any form at collection grain, with record status since the earlier
-# date and review marks.
+# date, unresolved queries from the EDC and review marks.
 
 listing_ui <- function(id, params, study) {
   ns <- shiny::NS(id)
@@ -23,6 +23,12 @@ listing_server <- function(id, ctx, params) {
       x <- data.frame(Subject = sid_link(t$SUBJID), Site = t$SITEID, Status = badge(status),
                       stringsAsFactors = FALSE, check.names = FALSE)
       for (c in cols) x[[c]] <- fmt_cell(t[[c]])
+      q <- ctx$queries()
+      if (!is.null(q)) {
+        open <- q[q$STATUS != "Closed" & !is.na(q$TARGET), , drop = FALSE]
+        n <- table(open$TARGET)[key]
+        x$Queries <- ifelse(is.na(n), "", badge(sprintf("%d open", as.integer(n))))
+      }
       x$Version <- t$VERSION
       with_marks(cbind(x, mark_cols(key, h$DEPHASH[match(key, h$TARGET_KEY)], t$SUBJID, t$VERSION)), ctx, "record")
     })

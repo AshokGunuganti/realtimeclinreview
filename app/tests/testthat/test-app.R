@@ -3,7 +3,7 @@ skip_if_not_installed("RSQLite")
 
 test_that("library display modules are registered", {
   expect_true(all(c("whats_new", "visit_grid", "over_time", "timeline", "listing", "check_results",
-                    "subject_profile") %in% display_modules()))
+                    "subject_profile", "site_scorecard", "coding_review", "lock_readiness") %in% display_modules()))
 })
 
 test_that("displays whose data is missing are left out", {
@@ -23,7 +23,8 @@ test_that("the example study's app builds with every configured screen", {
   displays <- resolve_displays(st$config$displays, review_cache(st)(st$extract_date))
   expect_equal(length(displays), length(st$config$displays))
   html <- as.character(app_ui(st, displays, st$config$app, c("101", "102")))
-  for (t in c("What.{1,6}s new", "Visit status", "mCSS over time", "AE listing", "Checks", "Subject profile")) {
+  for (t in c("What.{1,6}s new", "Visit status", "mCSS over time", "AE listing", "Checks", "Subject profile",
+              "Site scorecard", "AE coding", "Lock readiness")) {
     expect_match(html, t)
   }
 })
@@ -126,5 +127,78 @@ test_that("subject profile follows subject links", {
     session$setInputs(subject = "102-001")
     expect_equal(subject(), "102-001")
     expect_match(output$header$html, "102-001")
+  })
+})
+
+test_that("what's new and the profile leave out operational reports", {
+  st <- example_study()
+  expect_false(any(c("QUERY", "FSTAT") %in% clinical_forms(st)))
+  expect_true(all(c("AE", "SV") %in% clinical_forms(st)))
+  ctx <- test_ctx()
+  shiny::testServer(whatsnew_server, args = list(ctx = ctx, params = list()), {
+    expect_false(any(changes()$FORMOID %in% c("QUERY", "FSTAT")))
+  })
+})
+
+test_that("listings show unresolved queries on the queried record", {
+  ctx <- test_ctx()
+  q <- shiny::isolate(ctx$queries())
+  open <- q[q$STATUS != "Closed" & q$QRYFORM == "SV", ]
+  shiny::testServer(listing_server, args = list(ctx = ctx, params = list(form = "SV")), {
+    x <- tbl()
+    flagged <- x$.KEY[x$Queries != ""]
+    expect_setequal(flagged, unique(open$TARGET))
+    expect_match(x$Queries[x$.KEY == open$TARGET[1]], "1 open")
+  })
+})
+
+sc_params <- list(visits = list(form = "SV", date = "VISDAT", not_done = list(field = "VISND", value = "Yes"),
+                                fallback = list(TRTSDT = "PLANDY1")), query_age = 30, title = "Site scorecard")
+
+test_that("site scorecard has one row per site and filters queries by the clicked site", {
+  ctx <- test_ctx()
+  shiny::testServer(sites_server, args = list(ctx = ctx, params = sc_params), {
+    s <- score()
+    expect_setequal(s$SITEID, unique(ctx$data()$adsl$SITEID))
+    expect_true(all(s$STATUS %in% c("Needs attention", "Watch", "On track")))
+    expect_equal(sum(s$OPENQ), nrow(queries()))
+    expect_true(all(diff(queries()$`Age (d)`) <= 0))                     # oldest first
+    i <- which(s$OPENQ > 0)[1]
+    session$setInputs(`site-tbl_rows_selected` = i)
+    expect_equal(nrow(queries()), s$OPENQ[i])
+    expect_true(all(queries()$Site == s$SITEID[i]))
+  })
+})
+
+test_that("coding review lists inconsistent terms first and filters records by term", {
+  ctx <- test_ctx()
+  params <- list(form = "AE", verbatim = "AETERM", coded = "AEDECOD", soc = "AESOC", version = "MEDDRAV",
+                 date = "AECODDT", title = "AE coding")
+  shiny::testServer(coding_server, args = list(ctx = ctx, params = params), {
+    t <- terms()
+    expect_match(t$Consistent[1], "Inconsistent")
+    expect_equal(t$Verbatim[1], "ITCHY SKIN AT GEL SITE")
+    expect_equal(nrow(recs()), nrow(ctx$data()$tables$AE))
+    session$setInputs(`terms-tbl_rows_selected` = 1)
+    r <- recs()
+    expect_equal(nrow(r), t$Records[1])
+    expect_true(all(grepl("^AE:", r$.KEY)))
+    expect_false(anyNA(r$.DEPHASH))
+    expect_true(all(c("Flag", "Review", "Version") %in% names(r)))
+  })
+})
+
+test_that("lock readiness rolls forms up to subjects", {
+  ctx <- test_ctx()
+  shiny::testServer(lock_server, args = list(ctx = ctx, params = list(form_status = "FSTAT")), {
+    x <- lr()
+    expect_false(any(x$FORMOID %in% c("QUERY", "FSTAT")))
+    s <- subjects()
+    expect_equal(nrow(s), length(unique(x$SUBJID)))
+    expect_equal(s$STATUS[s$SUBJID == "109-001"], "Locked")             # withdrew in run-in
+    expect_equal(sum(x$OPENQ), sum(shiny::isolate(ctx$queries())$STATUS != "Closed"))
+    i <- which(s$SUBJID == "109-001")
+    session$setInputs(`subj-tbl_rows_selected` = i)
+    expect_equal(nrow(ftbl()), sum(x$SUBJID == "109-001"))
   })
 })

@@ -7,8 +7,10 @@
 #' Every module receives the same context `ctx`: `study`, `con` (review
 #' store), `user`, reactives `asof()`, `since()`, `site()`, `data()` and
 #' `data_since()` (review data from [rtcrcore::review_data()], filtered to the
-#' site), `record_hashes(form)` (hashes for record marks), `marks_rev()` and
-#' `bump_marks()` (refresh after marking) and `goto_subject(id)`.
+#' site), `queries()` (query status from the query report named by study.yml
+#' `app: queries`, or `NULL`), `record_hashes(form)` (hashes for record
+#' marks), `marks_rev()` and `bump_marks()` (refresh after marking) and
+#' `goto_subject(id)`.
 #'
 #' @param study_dir Study folder.
 #' @param extract Extract folder name; defaults to the latest.
@@ -46,12 +48,14 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
       selected_subject = selected_subject,
       goto_subject = function(id) {
         selected_subject(id)
-        if (!is.na(profile_id)) bslib::nav_select("tabs", profile_id)
+        # Root session: called from inside modules, whose session would namespace "tabs".
+        if (!is.na(profile_id)) bslib::nav_select("tabs", profile_id, session = session)
       }
     )
     ctx$data <- shiny::reactive(filter_site(cache(asof()), ctx$site()))
     ctx$data_since <- shiny::reactive(filter_site(cache(ctx$since()), ctx$site()))
     ctx$record_hashes <- function(form) record_hash_table(study, form, asof())
+    ctx$queries <- shiny::reactive(query_table(study, ctx$data(), asof()))
 
     # lapply, not for: each module must capture its own display's params (lazy evaluation).
     lapply(displays, function(d) d$def$server(d$id, ctx, d$params))
@@ -115,6 +119,25 @@ filter_site <- function(rd, site) {
   rd$summary$N <- vapply(rd$summary$ID, function(id) sum(rd$findings$CHECKID == id), integer(1))
   rd$summary$RESULT <- ifelse(rd$summary$N == 0, "pass", rd$summary$SEVERITY)
   rd
+}
+
+# Query status from the query report named by study.yml `app: queries`.
+query_table <- function(study, data, asof) {
+  q <- study$config$app$queries
+  t <- if (!is.null(q)) data$tables[[q]]
+  if (is.null(t)) NULL else rtcrcore::query_status(t, asof, study$mapping)
+}
+
+# Forms holding clinical data, leaving out operational reports (FORMTYPE report).
+clinical_forms <- function(study) {
+  Filter(function(f) !identical(study$mapping$forms[[f]]$type, "report"), names(study$tables))
+}
+
+# Findings from checks whose tier is not excluded, e.g. data issues without
+# clinical review flags.
+findings_by_tier <- function(data, exclude = "clinical") {
+  keep <- data$summary$ID[!data$summary$TIER %in% unlist(exclude)]
+  data$findings[data$findings$CHECKID %in% keep, , drop = FALSE]
 }
 
 # Record marks hash the collected fields only (never derived ones), so the same

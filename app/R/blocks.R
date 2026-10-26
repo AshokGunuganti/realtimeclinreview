@@ -9,7 +9,12 @@ badge_class <- c(
   "Resolved" = "b-ok", "error" = "b-crit", "warning" = "b-warn", "info" = "b-new", "pass" = "b-ok",
   "reviewed" = "b-ok", "needs re-review" = "b-warn", "not reviewed" = "b-chg",
   "Complete" = "b-ok", "Out of window" = "b-warn", "Overdue / not entered" = "b-ser", "Missed" = "b-crit",
-  "Not yet due" = "b-chg", "Discontinued" = "b-chg")
+  "Not yet due" = "b-chg", "Discontinued" = "b-chg",
+  "Needs attention" = "b-crit", "Watch" = "b-warn", "On track" = "b-ok",
+  "Open" = "b-warn", "Answered" = "b-new", "Closed" = "b-ok",
+  "Locked" = "b-ok", "Ready to lock" = "b-new", "Not ready" = "b-warn",
+  "Frozen" = "b-ok", "Signed" = "b-new", "SDV complete" = "b-chg", "Entered" = "b-chg",
+  "Not coded" = "b-warn", "Consistent" = "b-ok", "Inconsistent" = "b-crit", "Older version" = "b-chg")
 
 app_css <- "
   .kpi{border:1px solid #e7e6e2;border-radius:10px;padding:.7rem .9rem;background:#fff;height:100%}

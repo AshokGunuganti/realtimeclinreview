@@ -18,6 +18,7 @@ Imports:
     DBI,
     DT,
     htmltools,
+    jsonlite,
     openxlsx,
     plotly,
     rtcrcore,

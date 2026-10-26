@@ -69,7 +69,8 @@ Two packages, per `docs/design.md`:
 - [x] Standard derivations with unit tests (reference-range flags and unit conversion still to do)
 - [x] Review state (marks, sign-off, append-only audit trail); Postgres path written but not yet tested against a server
 - [x] App package: shell and display modules (what's new, visit status grid, over-time chart, event timeline, listing, check results, subject profile) with review marks and Excel export
-- [ ] Remaining displays: site scorecard, coding review, lock readiness; sign-off screen (needs SSO re-authentication); role filtering
+- [x] Operational displays: site scorecard, coding review, lock readiness, from the EDC query and form status reports (simulated in the example by `dev/simulate_example_ops.R`)
+- [ ] Sign-off screen (needs SSO re-authentication); role filtering
 - [ ] Get a dummy Medrio export to settle record keys and versioning
 
 ## License

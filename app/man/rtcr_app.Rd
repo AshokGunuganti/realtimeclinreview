@@ -33,6 +33,8 @@ study does not have.
 Every module receives the same context \code{ctx}: \code{study}, \code{con} (review
 store), \code{user}, reactives \code{asof()}, \code{since()}, \code{site()}, \code{data()} and
 \code{data_since()} (review data from \code{\link[rtcrcore:review_data]{rtcrcore::review_data()}}, filtered to the
-site), \code{record_hashes(form)} (hashes for record marks), \code{marks_rev()} and
-\code{bump_marks()} (refresh after marking) and \code{goto_subject(id)}.
+site), \code{queries()} (query status from the query report named by study.yml
+\code{app: queries}, or \code{NULL}), \code{record_hashes(form)} (hashes for record
+marks), \code{marks_rev()} and \code{bump_marks()} (refresh after marking) and
+\code{goto_subject(id)}.
 }

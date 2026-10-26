@@ -4,7 +4,9 @@
 
 mapping_schema_version <- 1L
 
-form_types <- c("subject", "visit", "log", "vendor")
+# "report" is an operational EDC report (queries, form status): keyed to
+# subjects, kept out of clinical displays.
+form_types <- c("subject", "visit", "log", "vendor", "report")
 
 # Header variables filled by the mapper itself, never by the spec.
 auto_header_vars <- c("FORMOID", "RECID", "VERSION")
@@ -26,7 +28,8 @@ spec_sheets <- list(
 #' with [validate_mapping()], and optionally writes it as YAML.
 #'
 #' Spec layout:
-#' * **Forms**: `FORMOID`, `FORMTYPE` (subject, visit, log or vendor),
+#' * **Forms**: `FORMOID`, `FORMTYPE` (subject, visit, log, vendor, or
+#'   report for operational EDC reports such as queries and form status),
 #'   `SOURCE` (file name in the extract), `KEY` (comma-separated source fields
 #'   that identify a record), `VERSIONING` (`single`: one row per key;
 #'   `rows`: several rows per key are successive versions, such as vendor

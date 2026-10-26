@@ -55,6 +55,11 @@ register_library_displays <- function() {
   register_display("timeline", timeline_ui, timeline_server,
                    function(p, data) has_fields(data, p$form, c(p$day, p$label, p$color)))
   register_display("subject_profile", profile_ui, profile_server, function(p, data) !is.null(data$adsl))
+  register_display("site_scorecard", sites_ui, sites_server,
+                   function(p, data) !is.null(data$adsl) && has_fields(data, p$visits$form, p$visits$date))
+  register_display("coding_review", coding_ui, coding_server,
+                   function(p, data) has_fields(data, p$form, c(p$verbatim, p$coded, p$soc, p$version, p$date)))
+  register_display("lock_readiness", lock_ui, lock_server, function(p, data) !is.null(data$tables[[p$form_status]]))
 }
 
 .onLoad <- function(libname, pkgname) {

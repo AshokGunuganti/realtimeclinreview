@@ -23,5 +23,6 @@ test_ctx <- function(asof = "2026-12-31", since = "2026-10-22", site = "All site
   ctx$data <- shiny::reactive(filter_site(cache(asof), site))
   ctx$data_since <- shiny::reactive(filter_site(cache(since), site))
   ctx$record_hashes <- function(form) record_hash_table(study, form, as.Date(asof))
+  ctx$queries <- shiny::reactive(query_table(study, ctx$data(), as.Date(asof)))
   ctx
 }
