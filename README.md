@@ -56,7 +56,7 @@ Two packages, per `docs/design.md`:
 - [x] Scaffold `core/` and `app/` packages (usethis, testthat, renv)
 - [x] Port standard header + as-of engine from `prototype/R/snapshot.R`
 - [x] Mapping-spec schema and compiler; convert the prototype study to `studies/example/`
-- [ ] Port checks into the registry format (ID, tier, applies-to, timing, severity, owner)
+- [x] Port checks into the registry format (ID, tier, applies-to, timing, severity, owner)
 - [ ] Standard derivations with unit tests
 - [ ] Review state (marks, sign-off, append-only audit trail)
 - [ ] Get a dummy Medrio export to settle record keys and versioning

@@ -64,7 +64,9 @@ test_that("unusable values go to the parse log, not silently", {
   expect_equal(v$VALUE, "WEEK 99")
   expect_equal(v$SUBJID, "102-001")
   expect_equal(v$ROW, 4)
-  expect_named(iss, c("FORMOID", "VARIABLE", "ROW", "SUBJID", "VALUE", "DETAIL"))
+  expect_named(iss, c("FORMOID", "RECID", "VARIABLE", "TRANSFORM", "ROW", "SUBJID", "VALUE", "DETAIL"))
+  expect_equal(v$RECID, "102-001|WEEK 99")
+  expect_equal(v$TRANSFORM, "visit")
 })
 
 test_that("duplicate keys on a single-version form are logged and the later row kept", {

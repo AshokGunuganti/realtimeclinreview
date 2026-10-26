@@ -40,7 +40,8 @@ read_extract <- function(dir, mapping) {
 #'   columns named by `visit` transforms).
 #' @return A list with `tables` (named list of CDM tables, each passing
 #'   [validate_cdm()]) and `issues` (the parse log: one row per value the
-#'   mapping could not use).
+#'   mapping could not use, with the record's `RECID` and the `TRANSFORM` that
+#'   failed; `key` for duplicate keys, `availdt` for rows with no `AVAILDT`).
 #' @export
 map_extract <- function(mapping, sources, schedule = NULL) {
   log <- new.env(parent = emptyenv())
@@ -50,8 +51,9 @@ map_extract <- function(mapping, sources, schedule = NULL) {
     tables[[id]] <- map_form(id, mapping$forms[[id]], mapping, sources, schedule, log)
   }
   issues <- if (length(log$rows)) do.call(rbind, log$rows) else
-    data.frame(FORMOID = character(), VARIABLE = character(), ROW = integer(), SUBJID = character(),
-               VALUE = character(), DETAIL = character(), stringsAsFactors = FALSE)
+    data.frame(FORMOID = character(), RECID = character(), VARIABLE = character(), TRANSFORM = character(),
+               ROW = integer(), SUBJID = character(), VALUE = character(), DETAIL = character(),
+               stringsAsFactors = FALSE)
   rownames(issues) <- NULL
   list(tables = tables, issues = issues)
 }
@@ -72,10 +74,11 @@ map_form <- function(id, f, mapping, sources, schedule, log) {
   }
   rownames(df) <- NULL
 
-  issue_for <- function(var) {
+  recid <- do.call(paste, c(unname(as.list(df[f$key])), sep = "|"))
+  issue_for <- function(var, transform) {
     function(rows, values, detail) {
       log$rows[[length(log$rows) + 1]] <- data.frame(
-        FORMOID = id, VARIABLE = var, ROW = as.integer(rows),
+        FORMOID = id, RECID = recid[rows], VARIABLE = var, TRANSFORM = transform, ROW = as.integer(rows),
         SUBJID = if ("SUBJID" %in% names(df)) df$SUBJID[rows] else NA_character_,
         VALUE = as.character(values), DETAIL = detail, stringsAsFactors = FALSE)
     }
@@ -86,7 +89,7 @@ map_form <- function(id, f, mapping, sources, schedule, log) {
   for (e in f$fields) {
     x <- lapply(e$source, function(col) if (col %in% names(df)) df[[col]] else rep(NA_character_, nrow(df)))
     ctx$variable <- e$variable
-    ctx$issue <- issue_for(e$variable)
+    ctx$issue <- issue_for(e$variable, e$transform)
     fn <- get(paste0("tf_", e$transform), mode = "function")
     res <- fn(x, e$args, ctx)
     if (is.list(res) && !is.null(res$value)) {
@@ -109,7 +112,7 @@ map_form <- function(id, f, mapping, sources, schedule, log) {
 
   noavail <- is.na(out$AVAILDT)
   if (any(noavail)) {
-    issue_for("AVAILDT")(which(noavail), NA_character_, "No availability date; record dropped")
+    issue_for("AVAILDT", "availdt")(which(noavail), NA_character_, "No availability date; record dropped")
     out <- out[!noavail, , drop = FALSE]
   }
   out <- out[order(out$RECID, out$AVAILDT), , drop = FALSE]
@@ -118,7 +121,7 @@ map_form <- function(id, f, mapping, sources, schedule, log) {
   } else {
     dup <- duplicated(out$RECID, fromLast = TRUE)
     if (any(dup)) {
-      issue_for("RECID")(out$.ROW[dup], out$RECID[dup], "Duplicate record key; earlier row dropped")
+      issue_for("RECID", "key")(out$.ROW[dup], out$RECID[dup], "Duplicate record key; earlier row dropped")
       out <- out[!dup, , drop = FALSE]
     }
     out$VERSION <- rep(1L, nrow(out))

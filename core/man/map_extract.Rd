@@ -17,7 +17,8 @@ columns named by \code{visit} transforms).}
 \value{
 A list with \code{tables} (named list of CDM tables, each passing
 \code{\link[=validate_cdm]{validate_cdm()}}) and \code{issues} (the parse log: one row per value the
-mapping could not use).
+mapping could not use, with the record's \code{RECID} and the \code{TRANSFORM} that
+failed; \code{key} for duplicate keys, \code{availdt} for rows with no \code{AVAILDT}).
 }
 \description{
 Applies each form's table steps, then each field transform in spec order,

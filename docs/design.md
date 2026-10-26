@@ -191,6 +191,8 @@ Checks are registered, not hard-coded. Each check is metadata plus one function,
 
 **Findings shape.** Every finding has its own key: check ID + subject + anchor (the source record's `FORMOID + RECID`, or subject + visit for missing-data findings such as an overdue visit) + field. It also carries the source VERSION, the value, a short message and a hash of only the fields the check depends on. Findings inherit EDC links and New/Changed status, and their review marks reset only when a relevant field changes.
 
+**Check types and checks.** A check type is one generic, unit-tested function with declared parameters; a check is a configured instance of a type with the metadata above. The library ships seven types: `parse_log` (values the mapping could not use, by transform), `subject_exists`, `missing_value`, `date_order`, `range` (bounds are numbers or other fields), `flag_when` and `reconcile` (match two forms by key, optionally only at visits a schedule column flags, with a date tolerance, one or both ways). Types that select records take `when`, a list of conditions (`field`, `op`, `value`) that must all hold. A parameter written `$name` reads the study's threshold `name`. Structural checks STR-001 to STR-006 ship ready-made and are switched on by ID.
+
 The library ships the structural and common cross-form checks. A study switches checks on in study.yml and can register its own in a study folder, without touching the package. The spec's data checks sheet is generated from the registry.
 
 ## Display library
