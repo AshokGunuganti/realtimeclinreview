@@ -109,3 +109,68 @@ checks:
       field: IGASCORE
       message: IGA worse than baseline
       when: [{field: IGASCORE, op: "<", value: 0}]
+
+# Standard derivations, run in order on the as-of snapshot.
+derivations:
+  - id: REF
+    type: reference_dates
+    description: Enrollment, first dose and last contact per subject
+    params:
+      subject_form: DM
+      dates:
+        - {name: ENRLDT, from: [{form: DM, field: ENRLDAT}]}
+        - {name: TRTSDT, from: [{form: EX, field: EXSTDAT}]}
+        - {name: LSTCNTDT, pick: last, from: [{form: SV, field: VISDAT}, {form: MCSS, field: PHOTODT}]}
+  - id: STATUS
+    type: subject_status
+    description: Ongoing, completed, discontinued or screen failure from disposition
+    params: {form: DS, field: DSDECOD, date: DSSTDAT, completed: COMPLETED, screen_failure: SCREEN FAILURE}
+  - id: AE-IMPUTE
+    type: impute_date
+    description: Complete partial AE start dates for derivations; never before first dose in the same month
+    params: {form: AE, field: AESTDAT, to: ASTDT, rule: first, not_before: TRTSDT}
+  - id: STUDY-DAY
+    type: study_day
+    description: Study day from first dose, no day 0
+    params:
+      items:
+        - {form: AE, field: ASTDT, to: ASTDY}
+        - {form: SV, field: VISDAT, to: ADY}
+  - id: TEAE
+    type: treatment_emergent
+    description: AE starting on or after first dose
+    params: {form: AE, start: ASTDT}
+  - id: PERIOD
+    type: period
+    description: Screening, run-in or treatment
+    params:
+      boundaries:
+        - {name: Run-in, from: ENRLDT}
+        - {name: Treatment, from: TRTSDT}
+      items:
+        - {form: SV, field: VISDAT}
+        - {form: AE, field: ASTDT}
+  - id: AVISIT
+    type: analysis_visit
+    description: Window flag for each visit; unscheduled visits go to the nearest nominal visit
+    params: {form: SV, field: VISDAT, keep_scheduled: true}
+  - id: MCSS-BASE
+    type: baseline
+    description: mCSS baseline is the last central read on or before first dose
+    params: {form: MCSS, value: MCSS, date: PHOTODT, rule: last_before_ref}
+  - id: COMPLIANCE
+    type: compliance
+    description: Dosing compliance per diary interval
+    params: {form: DIARY, prescribed: DOSPRESC, missed: DOSMISS}
+  - id: PK
+    type: pk_timing
+    description: Analysis value with BLQ results set to missing
+    params: {form: PK, value: PCSTRESN, blq_flag: PCBLQFL, blq_rule: missing, lloq: PCLLOQ}
+  - id: WORST-AE
+    type: worst
+    description: Most severe treatment-emergent AE per subject
+    params:
+      form: AE
+      field: AESEV
+      order: [MILD, MODERATE, SEVERE]
+      when: [{field: TRTEMFL, op: "==", value: "Y"}]

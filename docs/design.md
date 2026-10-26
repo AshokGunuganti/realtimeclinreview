@@ -163,6 +163,8 @@ Derivations are registered like checks, unit-tested once in the core package, an
 | Reference range flags | High, low and clinically significant flags from a ranges table keyed by lab, sex, age band and effective date | Ranges table and thresholds |
 | Unit conversion | Converts results to standard units | Conversion table |
 
+**Derivation types.** As with checks, each derivation is a configured instance of a registered type, run in study.yml order on the as-of snapshot, so later derivations can use earlier results (impute a partial AE start date, then derive study day and TRTEMFL from it). Subject-level results go to a derived subject table, ADSL (reference dates with a `<name>SRC` pointer to the source record, EOSSTT, EOSDT). Analysis visit targets count from the first visit on the same anchor in the visit schedule, so a run-in visit can anchor on enrollment and treatment visits on first dose; `keep_scheduled` keeps records collected at a scheduled visit on that visit and moves only unscheduled ones. Checks can run on the derived snapshot.
+
 **Rules.** Derivations are recomputed for every review date, so a corrected dose date or baseline value updates the flags automatically. Each derived value points back to its source records (BASE names the record it came from), so a reviewer can click through. Derived variables sit beside collected ones; collected values are never overwritten.
 
 ## Check library

@@ -200,4 +200,5 @@ register_library_check_types <- function() {
 
 .onLoad <- function(libname, pkgname) {
   register_library_check_types()
+  register_library_derivation_types()
 }

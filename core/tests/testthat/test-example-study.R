@@ -60,3 +60,30 @@ test_that("example study checks catch the prototype's corruptions", {
   expect_equal(unname(n[c("STR-001", "STR-002", "STR-003", "STR-004", "STR-005", "XF-IGA-001", "DM-DRY-001",
                           "XF-SV-001")]), c(1, 1, 1, 1, 1, 2, 1, 1))
 })
+
+test_that("example study derivations run and line up with the visit schedule", {
+  skip_if_not(dir.exists(study), "example study not available")
+  st <- yaml::read_yaml(file.path(study, "study.yml"))
+  m <- compile_spec(file.path(study, "mapping_spec.xlsx"))
+  sched <- utils::read.csv(file.path(study, "visit_schedule.csv"), stringsAsFactors = FALSE)
+  r <- map_extract(m, read_extract(file.path(study, "extracts", "2026-12-31"), m), sched)
+  d <- derive_snapshot(r$tables, define_derivations(st$derivations), as.Date("2026-10-22"), sched, st$thresholds)
+
+  a <- d$adsl
+  expect_equal(nrow(a), nrow(d$tables$DM))
+  expect_equal(sum(a$EOSSTT == "DISCONTINUED"), 1)
+  expect_true(all(is.na(a$TRTSDT) | a$TRTSDT >= a$ENRLDT))
+
+  sv <- d$tables$SV
+  done <- !is.na(sv$VISDAT)
+  expect_equal(sv$AVISITN[done], sv$VISITNUM[done])          # keep_scheduled
+  expect_true(all(sv$ADY[done & sv$VISITNUM == 2] == 1))     # Day 1 is first dose
+  # Simulated run-in visits can fall up to 7 days before enrollment (Screening), never in Treatment.
+  expect_true(all(sv$APERIODC[done & sv$VISITNUM == 1] %in% c("Screening", "Run-in")))
+  expect_true(all(sv$APERIODC[done & sv$VISITNUM > 2] == "Treatment"))
+
+  mc <- d$tables$MCSS
+  expect_true(all(mc$ABLFL[mc$VISITNUM == 2] %in% "Y" | is.na(mc$BASE[mc$VISITNUM == 2])))
+  post <- mc$APOSTFL %in% "Y"
+  expect_equal(mc$CHG[post], mc$MCSS[post] - mc$BASE[post])
+})

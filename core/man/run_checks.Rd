@@ -10,7 +10,8 @@ run_checks(
   asof,
   issues = NULL,
   schedule = NULL,
-  thresholds = list()
+  thresholds = list(),
+  derivations = NULL
 )
 }
 \arguments{
@@ -26,6 +27,9 @@ run_checks(
 \item{schedule}{Visit schedule data frame.}
 
 \item{thresholds}{Named list of study thresholds, for \code{"$name"} parameters.}
+
+\item{derivations}{Optional derivations from \code{\link[=define_derivations]{define_derivations()}}; when
+given, as-of checks see the derived snapshot and \code{ctx$adsl}.}
 }
 \value{
 A list: \code{findings} (one row per finding; \code{FINDINGKEY} is

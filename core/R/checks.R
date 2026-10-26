@@ -185,20 +185,30 @@ finding_cols <- c("FINDINGKEY", "CHECKID", "SEVERITY", "OWNER", "SUBJID", "SITEI
 #' @param issues Parse log from [map_extract()].
 #' @param schedule Visit schedule data frame.
 #' @param thresholds Named list of study thresholds, for `"$name"` parameters.
+#' @param derivations Optional derivations from [define_derivations()]; when
+#'   given, as-of checks see the derived snapshot and `ctx$adsl`.
 #' @return A list: `findings` (one row per finding; `FINDINGKEY` is
 #'   check + subject + anchor + field and is unique) and `summary` (one row
 #'   per check with its finding count and result).
 #' @export
-run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thresholds = list()) {
-  snap <- lapply(tables, as_of, d = asof)
+run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thresholds = list(),
+                       derivations = NULL) {
+  adsl <- NULL
+  if (is.null(derivations)) {
+    snap <- lapply(tables, as_of, d = asof)
+  } else {
+    dv <- derive_snapshot(tables, derivations, asof, schedule, thresholds)
+    snap <- dv$tables
+    adsl <- dv$adsl
+  }
   latest <- lapply(tables, function(t) if (nrow(t)) as_of(t, max(t$AVAILDT)) else t)
   sites <- subject_sites(snap)
 
   found <- list()
   for (chk in checks) {
     type <- get(chk$type, envir = check_type_registry, inherits = FALSE)
-    ctx <- list(tables = if (chk$timing == "load") latest else snap, issues = issues, schedule = schedule,
-                asof = asof)
+    ctx <- list(tables = if (chk$timing == "load") latest else snap, adsl = adsl, issues = issues,
+                schedule = schedule, asof = asof)
     params <- resolve_params(chk$params, thresholds, chk$id)
     raw <- type$fn(ctx, params)
     found[[chk$id]] <- complete_findings(raw, chk, ctx$tables, sites)
