@@ -34,7 +34,9 @@ given, as-of checks see the derived snapshot and \code{ctx$adsl}.}
 \value{
 A list: \code{findings} (one row per finding; \code{FINDINGKEY} is
 check + subject + anchor + field and is unique) and \code{summary} (one row
-per check with its finding count and result).
+per check with its category, finding count and result). A check that
+fails to run (for example a field the data does not have) has result
+\verb{not run} and the reason in \code{ERROR}; the other checks still run.
 }
 \description{
 As-of checks see each CDM table as of \code{asof} (\code{\link[=as_of]{as_of()}}); load checks see

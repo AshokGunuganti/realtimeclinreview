@@ -106,7 +106,9 @@ test_that("flag_when reads thresholds from study config", {
                             when = list(list(field = "PCSTRESN", op = ">=", value = "$pk_alert"))))
   expect_equal(run1(def, thresholds = list(pk_alert = 1.5))$findings$SUBJID, "102-001")
   expect_equal(nrow(run1(def, thresholds = list(pk_alert = 0.1))$findings), 2)
-  expect_error(run1(def), "threshold 'pk_alert' is not set")
+  s <- run1(def)$summary                                                # missing threshold: check not run
+  expect_equal(s$RESULT, "not run")
+  expect_match(s$ERROR, "threshold 'pk_alert' is not set")
 })
 
 test_that("reconcile reports unmatched records, schedule flags and date gaps", {

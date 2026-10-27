@@ -18,101 +18,10 @@ thresholds:
   entry_lag_target: 5    # days
   min_n: 3
 
-# Checks switched on for this study. Library checks by ID; study checks
-# configure a library check type. "$name" parameters read thresholds above.
-# Prototype equivalents (prototype/R/checks.R) in brackets.
-checks:
-  - STR-001                               # [SC-002]
-  - STR-002                               # [SC-009]
-  - STR-003                               # [SC-004]
-  - STR-004                               # [SC-005]
-  - STR-005                               # [SC-003]
-  - STR-006
-  - id: XF-IGA-001                        # [SC-006]
-    type: reconcile
-    name: IGA entered for each post-baseline visit
-    description: Visit done at a visit that schedules IGA, but no IGA record
-    tier: cross-form
-    severity: warning
-    owner: data management
-    params:
-      form_a: SV
-      form_b: IGA
-      schedule_flag: IGAFL
-      when_a: [{field: VISND, op: missing}]
-  - id: RC-MCSS-001                       # [SC-007]
-    type: reconcile
-    name: Central mCSS read received
-    description: Visit done, but no central mCSS read from the imaging vendor yet
-    tier: reconciliation
-    severity: warning
-    owner: data management
-    params:
-      form_a: SV
-      form_b: MCSS
-      when_a: [{field: VISND, op: missing}]
-  - id: DM-AE-001                         # [SC-008]
-    type: missing_value
-    name: AE coded
-    description: Adverse event entered but not yet MedDRA coded
-    tier: structural
-    severity: info
-    owner: data management
-    params: {form: AE, fields: AEDECOD, message: Awaiting MedDRA coding}
-  - id: DM-DRY-001                        # [SC-010]
-    type: range
-    name: Diary missed doses in range
-    description: Missed doses between 0 and doses prescribed
-    tier: cross-form
-    severity: error
-    owner: sites
-    params: {form: DIARY, field: DOSMISS, min: 0, max: DOSPRESC}
-  - id: XF-SV-001                         # [SC-011]
-    type: date_order
-    name: Post-baseline visit after first dose
-    description: Post-baseline visit date on or before the first dose date
-    tier: cross-form
-    severity: warning
-    owner: sites
-    params:
-      form: SV
-      field: VISDAT
-      ref_form: EX
-      ref_field: EXSTDAT
-      op: after
-      when: [{field: VISITNUM, op: ">", value: 2}]
-  - id: RC-PK-001
-    type: reconcile
-    name: PK sample on the visit date
-    description: PK collection date differs from the visit date, or no visit for the sample
-    tier: reconciliation
-    severity: warning
-    owner: data management
-    params: {form_a: PK, form_b: SV, date_a: PCDTC, date_b: VISDAT, tolerance: 0}
-  - id: CL-PK-001
-    type: flag_when
-    name: PK at or above alert level
-    description: Systemic exposure at or above the study PK alert threshold
-    tier: clinical
-    severity: warning
-    owner: safety
-    params:
-      form: PK
-      field: PCSTRESN
-      message: PK concentration at or above alert level
-      when: [{field: PCSTRESN, op: ">=", value: $pk_alert}]
-  - id: CL-IGA-001
-    type: flag_when
-    name: IGA worsening
-    description: Investigator Global Assessment shows worsening
-    tier: clinical
-    severity: info
-    owner: clinical
-    params:
-      form: IGA
-      field: IGASCORE
-      message: IGA worse than baseline
-      when: [{field: IGASCORE, op: "<", value: 0}]
+# Review checks: the check spec workbook the review team edits (canned set
+# plus study checks; see its How to sheet). Programmer checks on loading and
+# mapping always run and show only on the Data load page.
+check_spec: check_spec.xlsx
 
 # Standard derivations, run in order on the as-of snapshot.
 derivations:

@@ -26,18 +26,27 @@ test_that("example study spec compiles and its extract maps without issues", {
   expect_false(anyNA(r$tables$SV$VISITNUM))
 })
 
+# Programmer checks plus the review checks of the example's check spec.
+example_checks <- function() {
+  st <- yaml::read_yaml(file.path(study, "study.yml"))
+  define_checks(c(library_checks(), read_check_spec(file.path(study, st$check_spec))$checks))
+}
+
 example_run <- function(extract, asof) {
   st <- yaml::read_yaml(file.path(study, "study.yml"))
   m <- compile_spec(file.path(study, "mapping_spec.xlsx"))
   sched <- utils::read.csv(file.path(study, "visit_schedule.csv"), stringsAsFactors = FALSE)
   r <- map_extract(m, read_extract(extract, m), sched)
-  run_checks(r$tables, define_checks(st$checks), as.Date(asof), r$issues, sched, st$thresholds)
+  run_checks(r$tables, example_checks(), as.Date(asof), r$issues, sched, st$thresholds,
+             derivations = define_derivations(st$derivations))
 }
 
 test_that("example study checks run clean on the clean extract", {
   skip_if_not(dir.exists(study), "example study not available")
   res <- example_run(file.path(study, "extracts", "2026-12-31"), "2026-10-22")
-  expect_equal(sum(res$summary$N[res$summary$SEVERITY == "error"]), 0)
+  s <- res$summary
+  expect_equal(sum(s$N[s$SEVERITY == "error" & s$TIER != "clinical"]), 0)   # clinical flags are review items, not errors
+  expect_false(any(s$RESULT == "not run"))
   expect_false(anyDuplicated(res$findings$FINDINGKEY) > 0)
 })
 
@@ -98,7 +107,7 @@ test_that("example study review cycle: mark, sign off, come back after the next 
   m <- compile_spec(file.path(study, "mapping_spec.xlsx"))
   sched <- utils::read.csv(file.path(study, "visit_schedule.csv"), stringsAsFactors = FALSE)
   r <- map_extract(m, read_extract(file.path(study, "extracts", "2026-12-31"), m), sched)
-  ch <- define_checks(st$checks)
+  ch <- example_checks()
   dv <- define_derivations(st$derivations)
   # Two corrections arrive in November: a diary interval now breaks the missed-doses
   # range (a new finding) and the flagged PK result is re-reported (a changed finding).
@@ -128,9 +137,11 @@ test_that("example study review cycle: mark, sign off, come back after the next 
   dec <- compare_findings(run(since), run("2026-12-31"))
   dec <- apply_marks(con, st$study_id, dec[dec$FINDSTAT != "Resolved", ])
   expect_true(all(dec$REVIEW_STATUS[dec$FINDSTAT == "Persisting"] == "reviewed"))
-  expect_equal(dec$CHECKID[dec$FINDSTAT == "New"], "DM-DRY-001")
-  expect_equal(dec$REVIEW_STATUS[dec$FINDSTAT == "New"], "not reviewed")
-  expect_equal(dec$CHECKID[dec$FINDSTAT == "Changed"], "CL-PK-001")
-  expect_equal(dec$REVIEW_STATUS[dec$FINDSTAT == "Changed"], "needs re-review")
+  expect_true(all(dec$REVIEW_STATUS[dec$FINDSTAT == "New"] == "not reviewed"))
+  expect_true(all(dec$REVIEW_STATUS[dec$FINDSTAT == "Changed"] == "needs re-review"))
+  dq <- dec[dec$CHECKID %in% c("DM-DRY-001", "CL-PK-001"), ]
+  expect_equal(dq$CHECKID[dq$FINDSTAT == "New"], "DM-DRY-001")
+  expect_equal(dq$CHECKID[dq$FINDSTAT == "Changed"], "CL-PK-001")
+  expect_true("EX-COMP" %in% dec$CHECKID[dec$FINDSTAT == "Changed"])     # the same diary change lowers compliance
   expect_equal(nrow(audit_trail(con, st$study_id)), nrow(oct) + 1)
 })

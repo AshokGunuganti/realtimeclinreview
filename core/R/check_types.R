@@ -79,6 +79,37 @@ ct_flag_when <- function(ctx, p) {
   raw_findings(t$SUBJID, p$form, t$RECID, t$VISITNUM, p$field, t[[p$field]], rep(p$message, nrow(t)), depends = dep)
 }
 
+# Every record that meets `when`: new AEs, SAEs, low compliance. The finding
+# depends on the flagged field, the condition fields and `watch`, so a change
+# to any of them brings it back for review.
+ct_record <- function(ctx, p) {
+  t <- form_rows(ctx, p$form, p$when)
+  field <- if (is.null(p$field)) "RECID" else p$field
+  need_field(t, field, p$form)
+  wf <- vapply(p$when, `[[`, "", "field")
+  watch <- unique(c(field, unlist(p$watch), wf))
+  for (f in watch) need_field(t, f, p$form)
+  dep <- if (nrow(t)) do.call(paste, c(unname(lapply(t[watch], fmt_value)), sep = "|")) else character()
+  msg <- if (is.null(p$message)) paste(p$form, "record") else p$message
+  raw_findings(t$SUBJID, p$form, t$RECID, t$VISITNUM, field, fmt_value(t[[field]]), msg, depends = dep)
+}
+
+# Scheduled visits whose status on the review date is one of `statuses`
+# (see visit_status()). Overdue visits have no record, so they anchor on the visit.
+ct_visit_status <- function(ctx, p) {
+  if (is.null(ctx$adsl)) stop("Visit checks need the study's derivations (ADSL).", call. = FALSE)
+  if (is.null(ctx$schedule)) stop("Visit checks need the visit schedule.", call. = FALSE)
+  bad <- setdiff(unlist(p$statuses), visit_status_levels)
+  if (length(bad)) stop("Unknown visit status: ", paste(bad, collapse = ", "), ".", call. = FALSE)
+  nd <- if (length(p$not_done)) list(field = p$not_done[[1]]$field, value = unlist(p$not_done[[1]]$value)) else NULL
+  v <- visit_status(ctx$tables, ctx$adsl, ctx$schedule, ctx$asof, p$form, p$date, not_done = nd, fallback = p$fallback)
+  v <- v[v$STATUS %in% unlist(p$statuses), , drop = FALSE]
+  when <- ifelse(is.na(v$VISDT), paste("due", format(v$TARGDT)), paste("done", format(v$VISDT)))
+  msg <- if (is.null(p$message)) paste0(v$VISIT, ": ", tolower(v$STATUS), " (", when, ")") else rep(p$message, nrow(v))
+  raw_findings(v$SUBJID, p$form, v$RECID, v$VISITNUM, p$date, format(v$VISDT), msg,
+               depends = paste(v$STATUS, format(v$VISDT)))
+}
+
 ct_reconcile <- function(ctx, p) {
   by <- if (is.null(p$by)) c("SUBJID", "VISITNUM") else unlist(p$by)
   a <- form_rows(ctx, p$form_a, p$when_a)
@@ -128,6 +159,11 @@ ct_reconcile <- function(ctx, p) {
 }
 
 # Helpers ---------------------------------------------------------------------------
+
+fmt_value <- function(v) {
+  if (inherits(v, "POSIXct")) return(format(v, "%Y-%m-%dT%H:%M", tz = "UTC"))
+  as.character(v)
+}
 
 raw_findings <- function(subjid, formoid, recid, visitnum, field, value, message, depends = NULL) {
   n <- length(subjid)
@@ -193,6 +229,9 @@ register_library_check_types <- function() {
                       optional = "when")
   register_check_type("range", ct_range, required = c("form", "field"), optional = c("min", "max", "when"))
   register_check_type("flag_when", ct_flag_when, required = c("form", "field", "when", "message"))
+  register_check_type("record", ct_record, required = "form", optional = c("field", "when", "message", "watch"))
+  register_check_type("visit_status", ct_visit_status, required = c("form", "date", "statuses"),
+                      optional = c("not_done", "fallback", "message"))
   register_check_type("reconcile", ct_reconcile, required = c("form_a", "form_b"),
                       optional = c("by", "when_a", "when_b", "schedule_flag", "date_a", "date_b",
                                    "tolerance", "both_ways"))

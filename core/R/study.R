@@ -7,9 +7,14 @@
 #' @param dir Study folder (holds study.yml).
 #' @param extract Extract folder name under the study's `extracts` folder;
 #'   defaults to the latest (folders are named by extract date).
+#' With `check_spec` in study.yml, the review checks come from that
+#' workbook ([read_check_spec()]) and the programmer checks from
+#' [library_checks()] always run; `checks` in study.yml can add more. Without
+#' it, `checks` in study.yml lists every check.
+#'
 #' @return A list: `id`, `dir`, `config`, `mapping`, `schedule`,
-#'   `extract_date`, `tables`, `issues`, `checks`, `derivations`,
-#'   `thresholds`.
+#'   `extract_date`, `tables`, `issues`, `checks`, `check_spec` (from
+#'   [read_check_spec()], or `NULL`), `derivations`, `thresholds`.
 #' @export
 load_study <- function(dir, extract = NULL) {
   cfg <- yaml::read_yaml(file.path(dir, "study.yml"))
@@ -23,10 +28,12 @@ load_study <- function(dir, extract = NULL) {
     extract <- dirs[length(dirs)]
   }
   m <- map_extract(mapping, read_extract(file.path(ext_root, extract), mapping), schedule)
+  spec <- if (!is.null(cfg$check_spec)) read_check_spec(path(cfg$check_spec))
+  checks <- if (is.null(spec)) define_checks(cfg$checks) else define_checks(c(library_checks(), cfg$checks, spec$checks))
   list(
     id = cfg$study_id, dir = dir, config = cfg, mapping = mapping, schedule = schedule,
     extract_date = as.Date(extract, optional = TRUE), tables = m$tables, issues = m$issues,
-    checks = define_checks(cfg$checks), derivations = define_derivations(cfg$derivations),
+    checks = checks, check_spec = spec, derivations = define_derivations(cfg$derivations),
     thresholds = if (is.null(cfg$thresholds)) list() else cfg$thresholds
   )
 }

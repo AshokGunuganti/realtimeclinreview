@@ -10,12 +10,16 @@ load_study(dir, extract = NULL)
 \item{dir}{Study folder (holds study.yml).}
 
 \item{extract}{Extract folder name under the study's \code{extracts} folder;
-defaults to the latest (folders are named by extract date).}
+defaults to the latest (folders are named by extract date).
+With \code{check_spec} in study.yml, the review checks come from that
+workbook (\code{\link[=read_check_spec]{read_check_spec()}}) and the programmer checks from
+\code{\link[=library_checks]{library_checks()}} always run; \code{checks} in study.yml can add more. Without
+it, \code{checks} in study.yml lists every check.}
 }
 \value{
 A list: \code{id}, \code{dir}, \code{config}, \code{mapping}, \code{schedule},
-\code{extract_date}, \code{tables}, \code{issues}, \code{checks}, \code{derivations},
-\code{thresholds}.
+\code{extract_date}, \code{tables}, \code{issues}, \code{checks}, \code{check_spec} (from
+\code{\link[=read_check_spec]{read_check_spec()}}, or \code{NULL}), \code{derivations}, \code{thresholds}.
 }
 \description{
 Reads study.yml, compiles the mapping spec, reads one extract and maps it,

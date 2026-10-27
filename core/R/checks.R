@@ -4,7 +4,7 @@
 # findings in the same shape, so the app, the workbook and review state treat
 # them identically.
 
-check_tiers <- c("structural", "cross-form", "reconciliation", "clinical")
+check_tiers <- c("structural", "data", "cross-form", "reconciliation", "clinical")
 check_timings <- c("load", "asof")
 check_severities <- c("error", "warning", "info")
 check_owners <- c("data management", "clinical", "safety", "sites")
@@ -141,6 +141,12 @@ check_problems <- function(chk) {
 #' @return A data frame.
 #' @export
 checks_table <- function(checks) {
+  if (!length(checks)) {
+    return(data.frame(ID = character(), NAME = character(), DESCRIPTION = character(), CATEGORY = character(),
+                      TIER = character(), APPLIES_TO = character(), TIMING = character(), SEVERITY = character(),
+                      OWNER = character(), TYPE = character(), PARAMS = character(), CHANGED_ON = character(),
+                      CHANGED_BY = character(), REASON = character(), stringsAsFactors = FALSE))
+  }
   fmt_params <- function(p) {
     if (!length(p)) return("")
     paste(vapply(names(p), function(n) {
@@ -150,10 +156,15 @@ checks_table <- function(checks) {
       paste0(n, "=", v)
     }, ""), collapse = "; ")
   }
-  data.frame(
+  opt <- function(f, default = "") vapply(checks, function(c) {
+    v <- f(c)
+    if (is.null(v) || !length(v) || is.na(v[1])) default else as.character(v[1])
+  }, "")
+  out <- data.frame(
     ID = vapply(checks, `[[`, "", "id"),
     NAME = vapply(checks, `[[`, "", "name"),
     DESCRIPTION = vapply(checks, `[[`, "", "description"),
+    CATEGORY = opt(function(c) c$category, NA_character_),
     TIER = vapply(checks, `[[`, "", "tier"),
     APPLIES_TO = vapply(checks, function(c) paste(check_forms(c), collapse = ", "), ""),
     TIMING = vapply(checks, `[[`, "", "timing"),
@@ -161,8 +172,16 @@ checks_table <- function(checks) {
     OWNER = vapply(checks, `[[`, "", "owner"),
     TYPE = vapply(checks, `[[`, "", "type"),
     PARAMS = vapply(checks, function(c) fmt_params(c$params), ""),
+    CHANGED_ON = opt(function(c) c$changed$on),
+    CHANGED_BY = opt(function(c) c$changed$by),
+    REASON = opt(function(c) c$changed$reason),
     row.names = NULL, stringsAsFactors = FALSE)
+  out$CATEGORY[is.na(out$CATEGORY)] <- default_category(out$TIER[is.na(out$CATEGORY)])
+  out
 }
+
+# Category for checks that do not name one.
+default_category <- function(tier) ifelse(tier == "structural", "Data load", ifelse(tier == "clinical", "Clinical", "Data"))
 
 check_forms <- function(chk) {
   p <- chk$params
@@ -189,7 +208,9 @@ finding_cols <- c("FINDINGKEY", "CHECKID", "SEVERITY", "OWNER", "SUBJID", "SITEI
 #'   given, as-of checks see the derived snapshot and `ctx$adsl`.
 #' @return A list: `findings` (one row per finding; `FINDINGKEY` is
 #'   check + subject + anchor + field and is unique) and `summary` (one row
-#'   per check with its finding count and result).
+#'   per check with its category, finding count and result). A check that
+#'   fails to run (for example a field the data does not have) has result
+#'   `not run` and the reason in `ERROR`; the other checks still run.
 #' @export
 run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thresholds = list(),
                        derivations = NULL) {
@@ -205,13 +226,18 @@ run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thr
   sites <- subject_sites(snap)
 
   found <- list()
+  errors <- stats::setNames(rep(NA_character_, length(checks)), vapply(checks, `[[`, "", "id"))
   for (chk in checks) {
     type <- get(chk$type, envir = check_type_registry, inherits = FALSE)
     ctx <- list(tables = if (chk$timing == "load") latest else snap, adsl = adsl, issues = issues,
                 schedule = schedule, asof = asof)
-    params <- resolve_params(chk$params, thresholds, chk$id)
-    raw <- type$fn(ctx, params)
-    found[[chk$id]] <- complete_findings(raw, chk, ctx$tables, sites)
+    found[[chk$id]] <- tryCatch({
+      params <- resolve_params(chk$params, thresholds, chk$id)
+      complete_findings(type$fn(ctx, params), chk, ctx$tables, sites)
+    }, error = function(e) {
+      errors[[chk$id]] <<- conditionMessage(e)
+      empty_findings()
+    })
   }
   findings <- do.call(rbind, c(list(empty_findings()), unname(found)))
   rownames(findings) <- NULL
@@ -221,9 +247,10 @@ run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thr
          findings$FINDINGKEY[dup][1], ".", call. = FALSE)
   }
 
-  summary <- checks_table(checks)[c("ID", "NAME", "TIER", "TIMING", "SEVERITY", "OWNER")]
+  summary <- checks_table(checks)[c("ID", "NAME", "CATEGORY", "TIER", "TIMING", "SEVERITY", "OWNER")]
   summary$N <- vapply(summary$ID, function(id) sum(findings$CHECKID == id), integer(1))
-  summary$RESULT <- ifelse(summary$N == 0, "pass", summary$SEVERITY)
+  summary$RESULT <- ifelse(!is.na(errors[summary$ID]), "not run", ifelse(summary$N == 0, "pass", summary$SEVERITY))
+  summary$ERROR <- unname(errors[summary$ID])
   list(findings = findings, summary = summary)
 }
 
