@@ -27,14 +27,20 @@ A Shiny app object.
 \description{
 Loads the study, opens its review store and builds one screen per display
 configured in study.yml (\code{displays}), leaving out screens whose data the
-study does not have.
+study does not have. Displays with the same \code{group} share a menu.
 }
 \details{
+The review date, "changes since" date, site and a subject search sit in a
+strip at the top of every screen. Clicking a subject anywhere opens it in a
+side panel over the current screen.
+
 Every module receives the same context \code{ctx}: \code{study}, \code{con} (review
 store), \code{user}, reactives \code{asof()}, \code{since()}, \code{site()}, \code{data()} and
 \code{data_since()} (review data from \code{\link[rtcrcore:review_data]{rtcrcore::review_data()}}, filtered to the
 site), \code{queries()} (query status from the query report named by study.yml
-\code{app: queries}, or \code{NULL}), \code{record_hashes(form)} (hashes for record
-marks), \code{marks_rev()} and \code{bump_marks()} (refresh after marking) and
-\code{goto_subject(id)}.
+\code{app: queries}, or \code{NULL}), \code{changes()} (records new, changed or deleted in
+the window), \code{review_items()} and \code{review_queue()} (the review queue),
+\code{record_hashes(form)} (hashes for record marks), \code{marks_rev()} and
+\code{bump_marks()} (refresh after marking), \code{goto_subject(id)} (opens the
+subject panel), \code{open_profile(id)} and \code{goto_site(id)}.
 }

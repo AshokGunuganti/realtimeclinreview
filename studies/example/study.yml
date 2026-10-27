@@ -89,51 +89,80 @@ derivations:
       order: [MILD, MODERATE, SEVERE]
       when: [{field: TRTEMFL, op: "==", value: "Y"}]
 
-# Review app
+# Review app. Screens appear in the sidebar in this order, under their group's
+# heading; ungrouped screens come first. A screen is left out when its data is
+# not in the study.
 app:
   review_type: medical        # sign-off type that sets the default "changes since" date
   simulated: true
-  queries: QUERY              # query report: query status on listings, site scorecard and lock readiness
+  queries: QUERY              # query report: query status on listings, sites, queries and lock readiness
+  priority: [AE, PK, MCSS]    # in the review queue, subjects with changes to these forms come first
 displays:
-  - {id: new, module: whats_new, title: "What's new", params: {priority: [AE, PK, MCSS]}}
+  - {id: review, module: review_queue, title: My review}
+  - {id: changes, module: whats_new, title: All changes, params: {priority: [AE, PK, MCSS]}}
+
+  # Subjects
+  - {id: subjects, module: subject_list, title: Subject list, group: Subjects}
   - id: visits
     module: visit_grid
     title: Visit status
+    group: Subjects
     params: &visits
       form: SV
       date: VISDAT
       not_done: {field: VISND, value: "Yes"}
       fallback: {TRTSDT: PLANDY1}
-  - id: mcss
-    module: over_time
-    title: mCSS over time (central read)
-    params: {form: MCSS, value: MCSS, shade: [1], min_n: 3, y_label: mCSS total}
-  - id: mcss-chg
-    module: over_time
-    title: mCSS change from baseline
-    params: {form: MCSS, value: CHG, min_n: 3, y_label: Change from baseline}
-  - id: iga
-    module: over_time
-    title: IGA over time
-    params: {form: IGA, value: IGASCORE, min_n: 3, y_label: IGA (change score)}
-  - id: ae-timeline
-    module: timeline
-    title: Adverse events
-    params: {form: AE, day: ASTDY, label: AETERM, color: AESEV}
-  - {id: ae, module: listing, title: AE listing, params: {form: AE}}
-  - {id: pk, module: listing, title: PK listing, params: {form: PK}}
-  - {id: diary, module: listing, title: Dosing diary, params: {form: DIARY}}
-  - {id: checks, module: check_results, title: Checks}
-  - {id: sites, module: site_scorecard, title: Site scorecard, params: {visits: *visits, query_age: 30}}
-  - id: coding
-    module: coding_review
-    title: AE coding
-    params: {form: AE, verbatim: AETERM, coded: AEDECOD, soc: AESOC, version: MEDDRAV, date: AECODDT}
-  - {id: lock, module: lock_readiness, title: Lock readiness, params: {form_status: FSTAT}}
   - id: profile
     module: subject_profile
     title: Subject profile
+    group: Subjects
     params:
       timeline:
         - {form: SV, day: ADY, label: FOLDER}
         - {form: AE, day: ASTDY, label: AETERM}
+
+  # Safety
+  - id: ae
+    module: stack
+    title: Adverse events
+    group: Safety
+    params:
+      items:
+        - {module: timeline, title: AE timeline, params: {form: AE, day: ASTDY, label: AETERM, color: AESEV}}
+        - {module: listing, title: AE listing, params: {form: AE}}
+  - {id: pk, module: listing, title: PK, group: Safety, params: {form: PK}}
+  - {id: diary, module: listing, title: Dosing diary, group: Safety, params: {form: DIARY}}
+  - {id: flags, module: check_results, title: Clinical flags, group: Safety, params: {tiers: [clinical]}}
+
+  # Efficacy
+  - id: mcss
+    module: stack
+    title: mCSS (central read)
+    group: Efficacy
+    params:
+      items:
+        - {module: over_time, title: mCSS over time, params: {form: MCSS, value: MCSS, shade: [1], min_n: 3, y_label: mCSS total}}
+        - {module: over_time, title: mCSS change from baseline, params: {form: MCSS, value: CHG, min_n: 3, y_label: Change from baseline}}
+  - id: iga
+    module: over_time
+    title: IGA
+    group: Efficacy
+    params: {form: IGA, value: IGASCORE, min_n: 3, y_label: IGA (change score)}
+
+  # Data quality
+  - {id: checks, module: check_results, title: Data checks, group: Data quality, params: {tiers: [data, cross-form, reconciliation]}}
+  - {id: queries, module: query_list, title: Queries, group: Data quality, params: {form: QUERY, query_age: 30}}
+  - id: coding
+    module: coding_review
+    title: AE coding
+    group: Data quality
+    params: {form: AE, verbatim: AETERM, coded: AEDECOD, soc: AESOC, version: MEDDRAV, date: AECODDT}
+
+  # Operations
+  - {id: sites, module: site_scorecard, title: Sites, group: Operations, params: {visits: *visits, query_age: 30, form_status: FSTAT}}
+  - {id: lock, module: lock_readiness, title: Lock readiness, group: Operations, params: {form_status: FSTAT}}
+
+  # Close-out
+  - {id: signoff, module: sign_off, title: Sign-off, group: Close-out}
+  - {id: audit, module: audit_trail, title: Audit trail, group: Close-out}
+  - {id: load, module: data_load, title: Data load, group: Close-out}

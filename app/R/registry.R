@@ -34,7 +34,7 @@ resolve_displays <- function(config, data) {
     if (!isTRUE(def$needs(params, data))) next
     title <- if (is.null(d$title)) d$id else d$title
     if (is.null(params$title)) params$title <- title         # modules title their cards with it
-    out[[d$id]] <- list(id = d$id, title = title, module = d$module,
+    out[[d$id]] <- list(id = d$id, title = title, module = d$module, group = d$group,
                         params = params, def = def)
   }
   out
@@ -60,6 +60,13 @@ register_library_displays <- function() {
   register_display("coding_review", coding_ui, coding_server,
                    function(p, data) has_fields(data, p$form, c(p$verbatim, p$coded, p$soc, p$version, p$date)))
   register_display("lock_readiness", lock_ui, lock_server, function(p, data) !is.null(data$tables[[p$form_status]]))
+  register_display("review_queue", review_ui, review_server)
+  register_display("subject_list", subjects_ui, subjects_server, function(p, data) !is.null(data$adsl))
+  register_display("stack", stack_ui, stack_server, stack_needs)
+  register_display("query_list", queries_ui, queries_server, function(p, data) !is.null(data$tables[[p$form]]))
+  register_display("sign_off", signoff_ui, signoff_server)
+  register_display("audit_trail", audit_ui, audit_server)
+  register_display("data_load", dataload_ui, dataload_server)
 }
 
 .onLoad <- function(libname, pkgname) {

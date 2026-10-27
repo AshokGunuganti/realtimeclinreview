@@ -16,25 +16,7 @@ whatsnew_server <- function(id, ctx, params) {
   shiny::moduleServer(id, function(input, output, session) {
     prio <- unlist(params$priority)
     changes <- shiny::reactive({
-      asof <- ctx$asof()
-      since <- ctx$since()
-      site <- ctx$site()
-      out <- lapply(clinical_forms(ctx$study), function(f) {
-        cl <- rtcrcore::change_log(ctx$study$tables[[f]], since, asof)
-        cl <- cl[cl$RECSTAT != "Unchanged", , drop = FALSE]
-        if (!identical(site, "All sites")) cl <- cl[cl$SITEID %in% site, , drop = FALSE]
-        if (!nrow(cl)) return(NULL)
-        h <- ctx$record_hashes(f)
-        key <- paste0(f, ":", cl$RECID)
-        data.frame(FORMOID = f, SUBJID = cl$SUBJID, RECID = cl$RECID, RECSTAT = cl$RECSTAT, CHGVARS = cl$CHGVARS,
-                   VERSION = cl$VERSION, KEY = key, DEPHASH = h$DEPHASH[match(key, h$TARGET_KEY)],
-                   stringsAsFactors = FALSE)
-      })
-      d <- do.call(rbind, out)
-      if (is.null(d)) {
-        d <- data.frame(FORMOID = character(), SUBJID = character(), RECID = character(), RECSTAT = character(),
-                        CHGVARS = character(), VERSION = numeric(), KEY = character(), DEPHASH = character())
-      }
+      d <- ctx$changes()
       p <- match(d$FORMOID, prio)
       d[order(is.na(p), p, match(d$RECSTAT, c("Deleted", "Changed", "New")), d$FORMOID, d$SUBJID), , drop = FALSE]
     })

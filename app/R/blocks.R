@@ -14,22 +14,133 @@ badge_class <- c(
   "Open" = "b-warn", "Answered" = "b-new", "Closed" = "b-ok",
   "Locked" = "b-ok", "Ready to lock" = "b-new", "Not ready" = "b-warn",
   "Frozen" = "b-ok", "Signed" = "b-new", "SDV complete" = "b-chg", "Entered" = "b-chg",
-  "Not coded" = "b-warn", "Consistent" = "b-ok", "Inconsistent" = "b-crit", "Older version" = "b-chg")
+  "not run" = "b-crit", "Not coded" = "b-warn", "Consistent" = "b-ok", "Inconsistent" = "b-crit", "Older version" = "b-chg")
 
+# Quiet look: white ground, one blue for actions, colour only where it carries
+# meaning (flags, status), thin rules instead of boxes.
 app_css <- "
-  .kpi{border:1px solid #e7e6e2;border-radius:10px;padding:.7rem .9rem;background:#fff;height:100%}
-  .kpi .lab{font-size:.72rem;color:#52514e;text-transform:uppercase;letter-spacing:.04em}
-  .kpi .val{font-size:1.6rem;font-weight:650;line-height:1.15}
-  .kpi .sub{font-size:.78rem;color:#52514e}
-  .badge-s{display:inline-block;padding:.1rem .45rem;border-radius:999px;font-size:.72rem;font-weight:600;white-space:nowrap}
-  .b-crit{background:#fbe3e3;color:#8f1f1f}.b-warn{background:#fff1cf;color:#6b4a00}.b-ser{background:#fde8df;color:#8a3a17}
-  .b-new{background:#e3eefb;color:#174b8f}.b-chg{background:#ecebe7;color:#3b3a37}.b-ok{background:#e4f3e4;color:#145c14}
-  .card-header{font-weight:600;font-size:.92rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
-  .note{font-size:.78rem;color:#6b6a65}
-  a.sid{color:#2a78d6;font-weight:600;text-decoration:none;white-space:nowrap;cursor:pointer}
+  body{color:#16181d}
+  .note{font-size:.8rem;color:#5f6673}
+  .mono,.sid,.sid-big,.inbox-id{font-family:'IBM Plex Mono',ui-monospace,monospace}
+  .kpi{padding:.1rem 0;height:100%}
+  .kpi .lab{font-size:.78rem;color:#5f6673}
+  .kpi .val{font-size:1.75rem;font-weight:600;line-height:1.2}
+  .kpi .sub{font-size:.78rem;color:#5f6673}
+  .badge-s{display:inline-block;padding:.05rem .45rem;border-radius:4px;font-size:.72rem;font-weight:500;white-space:nowrap}
+  .b-crit{background:#fdecea;color:#a1251b}.b-warn{background:#fff3d6;color:#6b4a00}.b-ser{background:#fde8df;color:#8a3a17}
+  .b-new{background:#eef2fa;color:#2459c9}.b-chg{background:#f1f2f4;color:#3b414c}.b-ok{background:#e7f4ec;color:#1f6b45}
+  .card{border-color:#e6e8ec;box-shadow:none}
+  .card-header{background:#fff;border-bottom-color:#eef0f3;font-weight:600;font-size:.9rem;display:flex;
+    justify-content:space-between;align-items:center;gap:.5rem}
+  a.sid{color:#2459c9;font-weight:500;text-decoration:none;white-space:nowrap;cursor:pointer}
+  a.sid:hover{text-decoration:underline}
   .mark-bar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:end;margin-top:.5rem}
   .mark-bar .form-group{margin-bottom:0}
-  table.dataTable{font-size:.83rem}
+  table.dataTable{font-size:.84rem}
+  table.dataTable thead th{font-weight:500;color:#5f6673}
+  .side{background:#f8f9fb}
+  .side-brand{font-weight:600;padding:.1rem .6rem .9rem}
+  .side-nav{display:flex;flex-direction:column;gap:1px}
+  .side-group{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:#5f6673;padding:.9rem .6rem .25rem}
+  .side-link{display:flex;justify-content:space-between;align-items:center;padding:.38rem .6rem;border-radius:6px;
+    color:#3b414c;text-decoration:none;font-size:.88rem}
+  .side-link:hover{background:#eef0f3;color:#16181d}
+  .side-link.active{background:#e6ecf8;color:#16181d;font-weight:600}
+  .side-count{font-size:.75rem;color:#2459c9;font-weight:600}
+  .side-foot{font-size:.75rem;color:#5f6673;padding:1.2rem .6rem 0}
+  .page-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:.75rem 1.5rem;
+    padding-bottom:.9rem;margin-bottom:1.1rem;border-bottom:1px solid #e6e8ec}
+  .page-title{font-size:1.35rem;font-weight:600;margin:0}
+  .ctx-strip{display:flex;flex-wrap:wrap;gap:.5rem .75rem;align-items:end}
+  .ctx-strip .form-group{margin-bottom:0}
+  .ctx-strip label{font-size:.72rem;color:#5f6673;margin-bottom:.1rem}
+  .ctx-strip .form-control,.ctx-strip .selectize-input{font-size:.84rem;padding-top:.3rem;padding-bottom:.3rem;min-height:0;
+    line-height:1.5}
+  .ctx-strip .shiny-input-container{margin-bottom:0}
+  .ctx-strip .selectize-control{margin-bottom:0}
+  .ctx-strip .selectize-control.form-control{padding:0;border:0;height:auto;background:none}
+  .ctx-strip .selectize-input{height:32px;display:flex;align-items:center;overflow:hidden}
+  .ctx-strip .selectize-input>input{font-size:.84rem}
+  .load-banner{display:flex;gap:.75rem;align-items:center;padding:.45rem .8rem;margin:-.4rem 0 1rem;border-radius:6px;
+    background:#fff3d6;color:#6b4a00;font-size:.85rem}
+  .review-progress{display:flex;flex-wrap:wrap;gap:.4rem 1rem;align-items:center;margin-bottom:1rem}
+  .review-progress .grow{flex:1;min-width:240px}
+  .track{height:4px;border-radius:2px;background:#eef0f3;overflow:hidden;margin-top:.4rem}
+  .track i{display:block;height:100%;background:#1f7a4d}
+  .section-h{margin:1.75rem 0 .75rem;font-weight:600}
+  .stack-item + .stack-item{margin-top:1rem}
+  .site-head{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .9rem;margin-bottom:.75rem}
+  .site-head h4{margin:0;font-weight:600}
+  .inbox{display:flex;flex-wrap:wrap;border:1px solid #e6e8ec;border-radius:8px;min-height:560px}
+  .inbox-list{flex:1 1 260px;max-width:330px;border-right:1px solid #e6e8ec;max-height:78vh;overflow-y:auto}
+  .inbox-main{flex:999 1 480px;min-width:0;display:flex;flex-direction:column}
+  .inbox-main .inbox-scroll{padding:1.1rem 1.4rem;flex:1;overflow-y:auto;max-height:66vh}
+  .inbox-head{padding:1rem 1.4rem .8rem;border-bottom:1px solid #eef0f3}
+  .inbox-item{display:block;padding:.6rem .9rem;border-bottom:1px solid #f0f1f4;color:inherit;text-decoration:none;
+    cursor:pointer;border-left:3px solid transparent}
+  .inbox-item:hover{background:#f6f7f9}
+  .inbox-item.cur{background:#f2f5fb;border-left-color:#2459c9}
+  .inbox-item.done{color:#5f6673}
+  .inbox-row{display:flex;justify-content:space-between;gap:.5rem;align-items:baseline}
+  .inbox-id{font-weight:500;font-size:.86rem}
+  .inbox-chips{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.3rem}
+  .inbox-sep{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:#5f6673;padding:.8rem .9rem .3rem}
+  .inbox-empty{padding:3rem 1.4rem;color:#5f6673}
+  .inbox-foot,.panel-foot{border-top:1px solid #e6e8ec;padding:.7rem 1.4rem;display:flex;flex-wrap:wrap;gap:.5rem;
+    align-items:center;background:#fff}
+  .inbox-foot .form-group,.panel-foot .form-group{margin-bottom:0}
+  .inbox-foot .comment,.panel-foot .comment{flex:1 1 200px}
+  .subj-panel{--bs-offcanvas-width:min(700px,100vw)}
+  .subj-panel .offcanvas-header{border-bottom:1px solid #e6e8ec;align-items:flex-start}
+  .panel-id{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
+  .sid-big{font-size:1.3rem;font-weight:600;margin-right:.3rem}
+  .panel-sec{padding:.2rem 0 .8rem;margin-bottom:.8rem;border-bottom:1px solid #eef0f3}
+  .panel-sec-h{display:flex;justify-content:space-between;gap:.5rem;font-weight:600;font-size:.88rem;margin-bottom:.4rem}
+  .panel-sec.is-new .panel-sec-h span:first-child::before{content:'';display:inline-block;width:7px;height:7px;
+    border-radius:50%;background:#2459c9;margin-right:.45rem;vertical-align:middle}
+  .panel-tbl{overflow-x:auto}
+  .panel-tbl table{font-size:.8rem;margin-bottom:0;background:transparent}
+  .panel-tbl th{white-space:nowrap;font-weight:500;color:#5f6673}
+  .panel-tbl td:first-child{white-space:nowrap}
+  .panel-tbl tr.row-new td{background:#f2f5fb}
+  .panel-tbl mark{background:#fff3d6;padding:0 .15rem;border-radius:3px;cursor:help}
+  .panel-h{margin:1.1rem 0 .4rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:#5f6673;font-weight:600}
+  .panel-all summary{display:flex;justify-content:space-between;cursor:pointer;padding:.45rem 0;font-size:.88rem;
+    border-bottom:1px solid #f0f1f4}
+  .panel-all[open] summary{margin-bottom:.4rem}
+  .panel-tl{margin-bottom:.8rem}
+  .panel-tl .tl-axis{stroke:#e6e8ec}.panel-tl .tl-day1{stroke:#2459c9;stroke-dasharray:3 3}
+  .panel-tl .tl-pt{fill:#9aa1ad}.panel-tl .tl-new{fill:#2459c9}.panel-tl .tl-lab{font-size:10px;fill:#5f6673}
+  .kb-hint{font-size:.75rem;color:#5f6673;margin-left:auto}
+"
+
+# Sidebar navigation, the subject panel, and keys n/p/m (next, previous, mark
+# reviewed and next) in the open subject panel or else the review inbox.
+app_js <- "
+  function rtcrNav(a) {
+    Shiny.setInputValue('nav', a.dataset.value, {priority: 'event'});
+    var t = document.querySelector('.bslib-sidebar-layout > .collapse-toggle');
+    if (t && window.matchMedia('(max-width: 575.98px)').matches) t.click();
+  }
+  Shiny.addCustomMessageHandler('navactive', function(id) {
+    document.querySelectorAll('.side-link').forEach(function(a) { a.classList.toggle('active', a.dataset.value === id); });
+  });
+  Shiny.addCustomMessageHandler('subjpanel', function(m) {
+    var oc = bootstrap.Offcanvas.getOrCreateInstance(document.getElementById(m.id));
+    if (m.show) oc.show(); else oc.hide();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target;
+    if (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0) return;
+    var k = {n: 'kb-next', p: 'kb-prev', m: 'kb-mark'}[e.key];
+    if (!k) return;
+    var scope = document.querySelector('.subj-panel.show') || document.querySelector('.tab-pane.active .inbox');
+    var b = scope && scope.querySelector('.' + k);
+    if (!b) return;
+    e.preventDefault();
+    b.click();
+  });
 "
 
 badge <- function(x) {
@@ -41,6 +152,12 @@ badge <- function(x) {
 sid_link <- function(id) {
   ifelse(is.na(id), "", sprintf(
     "<a class=\"sid\" onclick=\"Shiny.setInputValue('goto_subject','%s',{priority:'event'})\">%s</a>",
+    htmltools::htmlEscape(id), htmltools::htmlEscape(id)))
+}
+
+site_link <- function(id) {
+  ifelse(is.na(id), "", sprintf(
+    "<a class=\"sid\" onclick=\"Shiny.setInputValue('goto_site','%s',{priority:'event'})\">%s</a>",
     htmltools::htmlEscape(id), htmltools::htmlEscape(id)))
 }
 
@@ -179,13 +296,19 @@ with_marks <- function(d, ctx, type) {
   d
 }
 
-# Excel export: the data sheet(s) plus an About sheet that records the context.
-write_export <- function(sheets, file, ctx) {
-  about <- data.frame(
+# What every export records about itself.
+about_table <- function(ctx) {
+  data.frame(
     Item = c("Study", "Review date", "Changes since", "Site", "Extract date", "Generated (UTC)", "User", "Note"),
     Value = c(ctx$study$id, format(ctx$asof()), format(ctx$since()), ctx$site(), format(ctx$study$extract_date),
               format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = "UTC"), ctx$user,
-              "Review marks are read-only here; the app is the record of review."))
+              "Review marks are read-only here; the app is the record of review."),
+    stringsAsFactors = FALSE)
+}
+
+# Excel export: the data sheet(s) plus an About sheet that records the context.
+write_export <- function(sheets, file, ctx) {
+  about <- about_table(ctx)
   wb <- openxlsx::createWorkbook()
   hs <- openxlsx::createStyle(textDecoration = "bold", fgFill = "#DDEBF7")
   for (nm in c(names(sheets), "About")) {

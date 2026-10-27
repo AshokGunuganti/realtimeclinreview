@@ -18,7 +18,7 @@ lock_ui <- function(id, params, study) {
 lock_server <- function(id, ctx, params) {
   shiny::moduleServer(id, function(input, output, session) {
     forms <- if (length(params$forms)) unlist(params$forms) else clinical_forms(ctx$study)
-    excl <- if (is.null(params$exclude_tiers)) "clinical" else params$exclude_tiers
+    excl <- if (is.null(params$exclude_tiers)) c("clinical", "structural") else params$exclude_tiers
     lr <- shiny::reactive({
       rd <- ctx$data()
       fs <- rtcrcore::form_status(rd$tables[[params$form_status]], ctx$asof())

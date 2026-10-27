@@ -23,9 +23,25 @@ test_that("the example study's app builds with every configured screen", {
   displays <- resolve_displays(st$config$displays, review_cache(st)(st$extract_date))
   expect_equal(length(displays), length(st$config$displays))
   html <- as.character(app_ui(st, displays, st$config$app, c("101", "102")))
-  for (t in c("What.{1,6}s new", "Visit status", "mCSS over time", "AE listing", "Checks", "Subject profile",
-              "Site scorecard", "AE coding", "Lock readiness")) {
+  for (t in c("My review", "Record changes", "Visit status", "mCSS over time", "AE listing", "Data checks",
+              "Clinical flags", "Subject profile", "Sites", "AE coding", "Lock readiness", "Sign-off", "Audit trail")) {
     expect_match(html, t)
+  }
+})
+
+test_that("the sidebar lists every screen under its group, in the order the groups first appear", {
+  st <- example_study()
+  displays <- resolve_displays(st$config$displays, review_cache(st)(st$extract_date))
+  html <- as.character(app_ui(st, displays, st$config$app, "101"))
+  groups <- regmatches(html, gregexpr('<div class="side-group">[^<]+</div>', html))[[1]]
+  expect_equal(gsub("<[^>]+>", "", groups), c("Subjects", "Safety", "Efficacy", "Data quality", "Operations",
+                                                "Close-out"))
+  links <- regmatches(html, gregexpr('class="side-link" href="\\?tab=[^"]+"', html))[[1]]
+  expect_equal(sub('.*tab=', "", sub('"$', "", links)), names(displays))
+  expect_match(html, "bslib-sidebar-layout")
+  expect_false(grepl("navbar-nav", html))                                # no top menu bar
+  for (id in c("asof", "since", "site", "find", "workbook", "panel-oc", "n_review", "page_title")) {
+    expect_match(html, sprintf('id="%s"', id))
   }
 })
 
@@ -155,7 +171,7 @@ test_that("listings show unresolved queries on the queried record", {
 sc_params <- list(visits = list(form = "SV", date = "VISDAT", not_done = list(field = "VISND", value = "Yes"),
                                 fallback = list(TRTSDT = "PLANDY1")), query_age = 30, title = "Site scorecard")
 
-test_that("site scorecard has one row per site and filters queries by the clicked site", {
+test_that("site scorecard has one row per site, linking to the site's page", {
   ctx <- test_ctx()
   shiny::testServer(sites_server, args = list(ctx = ctx, params = sc_params), {
     s <- score()
@@ -163,11 +179,29 @@ test_that("site scorecard has one row per site and filters queries by the clicke
     expect_true(all(s$STATUS %in% c("Needs attention", "Watch", "On track")))
     expect_equal(sum(s$OPENQ), nrow(queries()))
     expect_true(all(diff(queries()$`Age (d)`) <= 0))                     # oldest first
-    i <- which(s$OPENQ > 0)[1]
-    session$setInputs(`site-tbl_rows_selected` = i)
-    expect_equal(nrow(queries()), s$OPENQ[i])
-    expect_true(all(queries()$Site == s$SITEID[i]))
+    expect_match(tbl()$Site[1], "goto_site")
+    expect_false(one())
   })
+})
+
+test_that("with one site the sites screen is that site's page", {
+  ctx <- test_ctx(site = "111")
+  shiny::testServer(sites_server, args = list(ctx = ctx, params = c(sc_params, form_status = "FSTAT")), {
+    expect_true(one())
+    x <- subj()
+    expect_equal(nrow(x), nrow(ctx$data()$adsl))
+    expect_true(all(c("Next visit", "Overdue", "Missed", "Unresolved queries", "Awaiting SDV", "Open findings") %in%
+                      names(x)))
+    expect_equal(sum(x$`Unresolved queries`), nrow(queries()))
+    expect_equal(nrow(overdue()), sum(visits()$STATUS == "Overdue / not entered"))
+  })
+  v <- data.frame(SUBJID = c("1", "1", "1", "2"), VISIT = c("A", "B", "C", "A"),
+                  STATUS = c("Overdue / not entered", "Not yet due", "Not yet due", "Missed"),
+                  TARGDT = as.Date(c("2026-01-01", "2026-03-01", "2026-02-01", "2026-01-01")))
+  x <- site_subjects(data.frame(SUBJID = c("1", "2"), EOSSTT = c("ONGOING", "DISCONTINUED")), v)
+  expect_match(x$`Next visit`[1], "^C")                                   # earliest target date
+  expect_equal(x$Overdue, c("A", ""))
+  expect_equal(x$Missed, c(0, 1))
 })
 
 test_that("coding review lists inconsistent terms first and filters records by term", {
@@ -201,4 +235,49 @@ test_that("lock readiness rolls forms up to subjects", {
     session$setInputs(`subj-tbl_rows_selected` = i)
     expect_equal(nrow(ftbl()), sum(x$SUBJID == "109-001"))
   })
+})
+
+test_that("review workbook has contents, a sheet per check and a filterable patient profile", {
+  ctx <- test_ctx(site = "111")
+  rd <- shiny::isolate(ctx$data())
+  f <- rd$findings[1, ]
+  rtcrcore::set_mark(ctx$con, ctx$study$id, "finding", f$FINDINGKEY, "tester", "escalated", comment = "Call site",
+                     dephash = f$DEPHASH, subjid = f$SUBJID)
+  path <- withr::local_tempfile(fileext = ".xlsx")
+  review_workbook(rd, ctx$study, path, shiny::isolate(about_table(ctx)), ctx$con)
+
+  review <- rd$summary[rd$summary$TIER != "structural", ]                 # programmer checks stay out
+  sheets <- openxlsx::getSheetNames(path)
+  expect_equal(sheets, c("Contents", review$ID, "Patient profile", "About"))
+  expect_false(any(grepl("^STR-", sheets)))
+  toc <- openxlsx::read.xlsx(path, "Contents", startRow = 4)
+  expect_equal(toc$Findings[seq_len(nrow(review))], review$N)
+  expect_equal(toc$Category[seq_len(nrow(review))], review$CATEGORY)
+  expect_match(openxlsx::read.xlsx(path, "Contents", rows = 2, colNames = FALSE)[[1]],
+               sprintf("site 111\\. %d checks, %d findings\\.", nrow(review), sum(review$N)))
+  info <- openxlsx::read.xlsx(path, "AE-SAE", rows = 2:8, colNames = FALSE)
+  expect_match(info[[2]][info[[1]] == "Last changed"], "canned set")
+
+  chk <- openxlsx::read.xlsx(path, f$CHECKID, startRow = 11)
+  expect_equal(nrow(chk), sum(rd$findings$CHECKID == f$CHECKID))
+  expect_equal(chk$Review[1], "reviewed")
+  expect_equal(chk$Marked.by[1], "tester: escalated (Call site)")
+  empty <- setdiff(review$ID, rd$findings$CHECKID)[1]
+  expect_match(openxlsx::read.xlsx(path, empty, rows = 11, colNames = FALSE)[[1]], "No findings")
+
+  p <- openxlsx::read.xlsx(path, "Patient profile")
+  expect_setequal(unique(p$Subject), rd$adsl$SUBJID)
+  expect_false(any(p$Form %in% c("QUERY", "FSTAT")))
+  ae <- rd$tables$AE
+  expect_equal(sum(p$Form == "AE"), nrow(ae) * (ncol(ae) - sum(names(ae) %in% c(rtcrcore::cdm_header_vars(), "DELFL"))))
+  expect_true(all(p$Source[p$Form == "AE" & p$Field == "ASTDY"] == "Derived"))
+  expect_true(all(p$Source[p$Form == "AE" & p$Field == "AETERM"] == "Collected"))
+  wb <- openxlsx::loadWorkbook(path)
+  expect_match(wb$worksheets[[which(names(wb) == "Patient profile")]]$autoFilter, "A1:L1")
+})
+
+test_that("sheet names are legal, unique and do not clash with fixed sheets", {
+  n <- check_sheet_names(c("A[1]:b*?/\\c", "Contents", "X", "X", strrep("y", 40)))
+  expect_equal(n, c("A_1__b____c", "Contents_", "X", "X_1", strrep("y", 27)))
+  expect_true(all(nchar(n) <= 31))
 })

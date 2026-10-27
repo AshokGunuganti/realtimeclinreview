@@ -2,6 +2,7 @@
 
 export(display_modules)
 export(register_display)
+export(review_workbook)
 export(rtcr_app)
 export(run_app)
 export(table_card_server)

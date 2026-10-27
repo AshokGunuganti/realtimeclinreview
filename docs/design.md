@@ -171,13 +171,20 @@ Derivations are registered like checks, unit-tested once in the core package, an
 
 Checks are registered, not hard-coded. Each check is metadata plus one function, and every check returns findings in the same shape, so the app, the workbook and review state handle them identically.
 
+**Two audiences.** *Review checks* look at the study data being collected: new and changed AEs, serious and severe AEs, low dosing compliance, missed, overdue and out-of-window visits, discontinuations, study rules such as a PK alert, and data issues sites must fix. They are what reviewers see on screen and in the workbook. *Programmer checks* (the structural tier, STR-001 to STR-006) test that the extract loaded and mapped cleanly. They always run, but appear only on the Data load page; reviewers see a one-line banner when one fails or a check cannot run, because data may then be missing. They never go into the review workbook.
+
+**Check spec.** Review checks live in a check spec workbook (`check_spec.xlsx`, named by study.yml `check_spec`), separate from the mapping spec, so the review team owns them. Every study starts from the canned set (`canned_checks()`, written by `write_check_spec()`), which uses standard collected variable names; the team then adds rows, changes forms, fields, conditions and thresholds, and retires rows, without programming. One row per check: ID, name, description, category (Safety, Dosing, Visits, Disposition, Efficacy, Data), tier (`clinical` for medical review, `data` for data issues), type, form, field, conditions in plain text (`AESER == Y; AESEV in MODERATE, SEVERE`; `$name` reads a study threshold), other settings (`name=value; ...`), message, severity, owner, status (`active` or `retired`) and the last change (on, by, reason). Rows are retired, never deleted, so the sheet is the history; the file itself is versioned with the study. A row the app cannot read (an unknown type, a mistyped condition, a duplicate ID) is skipped and listed on the Data load page, and a check that fails on the data (a field the form does not have) shows as *not run* with the reason; neither stops the other checks. The workbook carries a Check types help sheet and a How to sheet, with drop-down lists for type, tier, severity, owner and status.
+
+**New, changed and back for review.** Every check flags each record that meets its condition on the review date, so "new AE" is the AE check's findings that are new since the earlier date, and the app shows them first. A finding's hash covers the fields the check watches (for AEs: term, dates, severity, seriousness, causality, outcome), so a worsened AE comes back for review and an edit to an unrelated field does not. The review queue holds clinical flags new or changed in the window, plus any reviewed flag whose data has changed since.
+
 **Check metadata**
 
 | Field | Purpose |
 | --- | --- |
 | ID | Stable identifier, e.g. `XF-AE-001` |
 | Name and description | Shown in the app and on the workbook contents sheet |
-| Tier | Structural, cross-form or clinical (below) |
+| Category | Grouping for screens and the workbook: Safety, Dosing, Visits, Disposition, Efficacy, Data, Data load |
+| Tier | Structural, data, cross-form, reconciliation or clinical (below) |
 | Applies to | Form type or named forms the check needs |
 | Timing | Load (once per extract) or as-of (re-run for each review date) |
 | Severity | Error, warning or info |
@@ -193,17 +200,29 @@ Checks are registered, not hard-coded. Each check is metadata plus one function,
 
 **Findings shape.** Every finding has its own key: check ID + subject + anchor (the source record's `FORMOID + RECID`, or subject + visit for missing-data findings such as an overdue visit) + field. It also carries the source VERSION, the value, a short message and a hash of only the fields the check depends on. Findings inherit EDC links and New/Changed status, and their review marks reset only when a relevant field changes.
 
-**Check types and checks.** A check type is one generic, unit-tested function with declared parameters; a check is a configured instance of a type with the metadata above. The library ships seven types: `parse_log` (values the mapping could not use, by transform), `subject_exists`, `missing_value`, `date_order`, `range` (bounds are numbers or other fields), `flag_when` and `reconcile` (match two forms by key, optionally only at visits a schedule column flags, with a date tolerance, one or both ways). Types that select records take `when`, a list of conditions (`field`, `op`, `value`) that must all hold. A parameter written `$name` reads the study's threshold `name`. Structural checks STR-001 to STR-006 ship ready-made and are switched on by ID.
+**Check types and checks.** A check type is one generic, unit-tested function with declared parameters; a check is a configured instance of a type with the metadata above. The library ships nine types: `record` (every record that meets the conditions, with the fields to watch), `visit_status` (scheduled visits that are missed, overdue or out of window on the review date), `parse_log` (values the mapping could not use, by transform), `subject_exists`, `missing_value`, `date_order`, `range` (bounds are numbers or other fields), `flag_when` and `reconcile` (match two forms by key, optionally only at visits a schedule column flags, with a date tolerance, one or both ways). Types that select records take `when`, a list of conditions (`field`, `op`, `value`) that must all hold. A parameter written `$name` reads the study's threshold `name`. Structural checks STR-001 to STR-006 ship ready-made and always run with a check spec. Each check runs on its own: one that fails is reported as *not run* and the rest carry on.
 
-The library ships the structural and common cross-form checks. A study switches checks on in study.yml and can register its own in a study folder, without touching the package. The spec's data checks sheet is generated from the registry.
+A study without a check spec can still list its checks in study.yml (`checks`), and a study can register its own check types in a study folder, without touching the package.
 
 ## Display library
 
 Screens are built from generic Shiny modules that work off form types, configured per study in study.yml and filtered by the user's role in the core. Each module declares the form types and fields it needs, and the app only shows a screen when that data exists, so a study with no PK simply has no PK view.
 
+**Layout.** The app is organised around the review a reviewer has to get through, not around the order screens were built, and kept quiet: white ground, one blue for actions, colour only where it carries meaning. A sidebar lists every screen under a few headings, so any screen is one click away: My review and All changes at the top, then Subjects (subject list, visit status, full profile), Safety (adverse events, PK, dosing, clinical flags), Efficacy, Data quality (data checks, queries, coding), Operations (sites, lock readiness) and Close-out (sign-off, audit trail, data load). On a phone the sidebar folds away. Above every screen sit its title and one row of controls: review date, changes since, site, a subject search and the review workbook.
+
+**My review** is an inbox: the subjects with new, changed or deleted clinical data in the review window, or a clinical flag new in it, are listed on the left (still to review first, with chips for what changed and which flags fired), and the selected subject is on the right, new data first. **Reviewed, next** marks the subject and opens the one below it.
+
+**Subject panel.** On every other screen, a subject ID (a table, the timeline, the search box, `?subject=`) opens the subject in a side panel over the current screen, so closing it returns the reviewer to the same place. The panel and the inbox show the same view: what is new first: clinical flags, then each form's new, changed and deleted records with changed values highlighted (the earlier value on hover), then unresolved queries, data findings and all of the subject's data by form, with a timeline by study day. **Reviewed, next** marks every item of the subject still to review (each record and clinical flag gets its own mark, with the chosen outcome and comment) and opens the next subject in the queue; keys m (reviewed, next), n and p move through the queue without the mouse.
+
+**Review cycle and sign-off.** Medical review works subject by subject. Review marks on records and flags give each subject's status in the window (reviewed when every item has a current mark), and so the queue's progress. When nothing in the window is left to review, the reviewer signs off the cycle for the whole study: the sign-off records the scope hash of every item reviewed, and its review date becomes the default "changes since" for the next cycle. A per-subject "medical review complete" before database lock is a separate close-out step. Signing needs re-authentication through the hosting platform's single sign-on; until that is connected, only simulated studies can sign, as a demonstration.
+
+**Roles (version 2).** Version 1 gives every user the same layout. Roles will come from the login: when a user is granted access they get a role, and the role sets the home queue (for example data managers land on open data findings, CRAs on their site), the default filters and the sign-off type. The sidebar configuration does not change.
+
 | Module | Works on | Shows |
 | --- | --- | --- |
+| Review queue | All forms | My review: subjects with new data or open clinical flags in the window, progress, and the record and finding changes |
 | What's new | All forms | New, changed and deleted records since the last review, by priority |
+| Subject list | Subject data | Every subject with status, reference dates, review status and open items |
 | Visit status grid | Visit forms | Subject by visit: complete, out of window, overdue, missed; no expected visits after discontinuation |
 | Over-time chart | Visit and vendor findings | A chosen parameter by visit: individual lines, mean with CI, reference bands |
 | Event timeline | Log forms | Events by study day, colored by a chosen field (e.g. severity) |
@@ -213,8 +232,11 @@ Screens are built from generic Shiny modules that work off form types, configure
 | Check results | Check library | Findings by check, with counts and review status |
 | Coding review | Coded log forms | Verbatim term against coded term, with consistency across subjects |
 | Lock readiness | All forms | Per subject and form: open queries, missing data, PI signature, SDV, freeze and lock status |
+| Queries | Query report | Every EDC query with its status on the review date, unresolved and oldest first |
+| Sign-off, audit trail | Review store | Sign-off of the review cycle and its history; every mark and sign-off, newest first |
+| Stack | Other modules | Several modules on one page, e.g. the AE timeline above the AE listing |
 
-**Configuration.** study.yml `displays` lists the screens in order: each has an `id`, a `module`, a `title` and module `params` (for example `visit_grid` takes the visit form, its date field, the not-done flag and a fallback anchor such as planned Day 1 for subjects not yet dosed). The core supplies everything a screen computes (`review_data()` per review date, `visit_status()`), so the app only presents. Screens accept deep links: `?tab=<id>` and `?subject=<id>`.
+**Configuration.** study.yml `displays` lists the screens in order: each has an `id`, a `module`, a `title`, an optional `group` (the sidebar heading it sits under) and module `params` (for example `visit_grid` takes the visit form, its date field, the not-done flag and a fallback anchor such as planned Day 1 for subjects not yet dosed). The core supplies everything a screen computes (`review_data()` per review date, `visit_status()`), so the app only presents. Screens accept deep links: `?tab=<id>` and `?subject=<id>`. The site scorecard links each site to the site's own page (its subjects, next and overdue visits, unresolved queries, forms awaiting SDV), which sets Site for every screen. The review workbook exports the whole review for the review date and site in one Excel file: a contents sheet linking to one sheet per check (description, settings, findings with review status), a patient profile sheet with every subject's data one row per field (filter on Subject; derived fields labelled), and an About sheet; each export is logged.
 
 **Operational reports.** The EDC query report and form status report are mapped like any source, with form type `report`, which keeps them out of clinical screens (what's new, subject profile). Their status is derived against the review date from their dates (opened, answered, closed; SDV, PI signature, freeze, lock), and dates after the review date count as not yet happened, so an earlier review date shows the status as it stood then. The query report needs the queried form's record key fields so each query links to its record; listings then show unresolved queries per record (study.yml `app: queries` names the report). Lock readiness counts findings from data checks, not clinical review flags; vendor data has no EDC form status, so a subject counts as locked when every EDC form is locked and the vendor data has no blockers. Coding review compares normalized verbatim terms, flags a verbatim coded to more than one term, and flags codes from an older dictionary version than the latest in use. To confirm with Medrio: whether the form status report carries the SDV, signature, freeze and lock dates, or only the current status.
 
@@ -291,9 +313,9 @@ The package is tested in five layers, all run in continuous integration:
 
 ## Roadmap and open decisions
 
-**Version 1:** collected data model with record keys and crosswalk; Medrio and CSV/SAS connectors with extract intake checks; mapping spec compiler; as-of engine and change log; standard derivations; structural, cross-form, reconciliation and clinical checks; display modules (what's new, visit status, over-time chart, event timeline, listing, site scorecard, subject profile, check results, coding review, lock readiness); review marks, sign-off and audit trail; role-scoped Excel workbook; run log, alerts and study archive; validation templates; a simulated example study and documentation site.
+**Version 1:** collected data model with record keys and crosswalk; Medrio and CSV/SAS connectors with extract intake checks; mapping spec compiler; as-of engine and change log; standard derivations; structural, cross-form, reconciliation and clinical checks; display modules (review queue with subject panel, what's new, subject list, visit status, over-time chart, event timeline, listing, site scorecard and site page, subject profile, check results, queries, coding review, lock readiness); review marks, sign-off and audit trail; role-scoped Excel workbook; run log, alerts and study archive; validation templates; a simulated example study and documentation site.
 
-**Version 2:** PDF patient profiles; CDISC ODM connector; SAE reconciliation with the safety database; weekly digest emails and risk indicators with thresholds (KRIs, QTLs); cross-study portfolio view; optional SDTM export, possibly through sdtm.oak.
+**Version 2:** roles from the login, each with its own home queue and defaults; PDF patient profiles; CDISC ODM connector; SAE reconciliation with the safety database; weekly digest emails and risk indicators with thresholds (KRIs, QTLs); cross-study portfolio view; optional SDTM export, possibly through sdtm.oak.
 
 **Open decisions**
 
