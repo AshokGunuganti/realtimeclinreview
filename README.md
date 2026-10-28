@@ -76,6 +76,7 @@ Two packages, per `docs/design.md`:
 - [x] Operational displays: site scorecard, coding review, lock readiness, from the EDC query and form status reports (simulated in the example by `dev/simulate_example_ops.R`)
 - [x] Reviewer-first layout: sidebar navigation, My review inbox, subject side panel with reviewed & next, site page, queries, sign-off (demonstration only until SSO re-authentication) and audit trail
 - [x] Check spec for the review team: canned review checks per study, add, change and retire checks in Excel; programmer checks on the Data load page only
+- [x] Continuous integration: GitHub Actions runs R CMD check on both packages and every test suite on each push
 - [ ] SSO re-authentication for sign-off; roles from the login (version 2)
 - [ ] Get a dummy Medrio export to settle record keys and versioning
 
