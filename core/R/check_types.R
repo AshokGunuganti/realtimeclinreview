@@ -110,6 +110,29 @@ ct_visit_status <- function(ctx, p) {
                depends = paste(v$STATUS, format(v$VISDT)))
 }
 
+# Dates later than the data cut (the latest availability date in the
+# extract): a date in the future when it was entered, usually a typing error.
+# Every date field of the forms (all forms when none are named), header dates
+# left out.
+ct_future_date <- function(ctx, p) {
+  forms <- if (length(p$form)) unlist(p$form) else names(ctx$tables)
+  skip <- c(unlist(p$exclude), c("ENTRYDT", "UPDDT", "AVAILDT"))
+  out <- lapply(forms, function(fm) {
+    t <- form_table(ctx, fm)
+    fields <- if (length(p$fields)) unlist(p$fields) else
+      setdiff(names(t)[vapply(t, inherits, logical(1), c("Date", "POSIXct"))], skip)
+    do.call(rbind, lapply(fields, function(f) {
+      need_field(t, f, fm)
+      d <- as_day(t[[f]])
+      bad <- which(!is.na(d) & d > ctx$cut)
+      if (!length(bad)) return(NULL)
+      raw_findings(t$SUBJID[bad], fm, t$RECID[bad], t$VISITNUM[bad], f, format(d[bad]),
+                   paste0(f, " ", format(d[bad]), " is after the data cut (", format(ctx$cut), ")"))
+    }))
+  })
+  do.call(rbind, out)
+}
+
 ct_reconcile <- function(ctx, p) {
   by <- if (is.null(p$by)) c("SUBJID", "VISITNUM") else unlist(p$by)
   a <- form_rows(ctx, p$form_a, p$when_a)
@@ -232,6 +255,7 @@ register_library_check_types <- function() {
   register_check_type("record", ct_record, required = "form", optional = c("field", "when", "message", "watch"))
   register_check_type("visit_status", ct_visit_status, required = c("form", "date", "statuses"),
                       optional = c("not_done", "fallback", "message"))
+  register_check_type("future_date", ct_future_date, optional = c("form", "fields", "exclude", "message"))
   register_check_type("reconcile", ct_reconcile, required = c("form_a", "form_b"),
                       optional = c("by", "when_a", "when_b", "schedule_flag", "date_a", "date_b",
                                    "tolerance", "both_ways"))

@@ -125,3 +125,32 @@ test_that("a check that cannot run is reported and the rest still run", {
   expect_match(x$ERROR, "no field NOFIELD")
   expect_gt(sum(rd$summary$N), 0)
 })
+
+test_that("dates after the data cut are flagged, header dates are not", {
+  study <- test_path("..", "..", "..", "studies", "example")
+  skip_if_not(dir.exists(study), "example study not available")
+  s <- load_study(study)
+  rd <- review_data(s, "2026-12-31")
+  f <- rd$findings[rd$findings$CHECKID == "DT-FUT", ]
+  ae <- rd$tables$AE
+  expect_equal(sort(f$RECID), sort(ae$RECID[!is.na(ae$AECODDT) & ae$AECODDT > as.Date("2026-12-31")]))
+  expect_true(all(f$FIELD == "AECODDT"))
+  expect_match(f$MESSAGE[1], "after the data cut \\(2026-12-31\\)")
+  expect_equal(sum(review_data(s, "2026-10-22")$findings$CHECKID == "DT-FUT"), 0)   # not yet entered then
+
+  one <- list(id = "F-1", type = "future_date", name = "n", description = "d", tier = "data", timing = "asof",
+              severity = "warning", owner = "sites", params = list(form = "AE", exclude = "AECODDT"))
+  s$checks <- list(`F-1` = one)
+  expect_equal(nrow(review_data(s, "2026-12-31")$findings), 0)                  # field left out
+})
+
+test_that("review data derives once and gives the same findings as deriving inside the checks", {
+  study <- test_path("..", "..", "..", "studies", "example")
+  skip_if_not(dir.exists(study), "example study not available")
+  s <- load_study(study)
+  rd <- review_data(s, "2026-10-22")
+  ck <- run_checks(s$tables, s$checks, as.Date("2026-10-22"), s$issues, s$schedule, s$thresholds,
+                   derivations = s$derivations)
+  expect_equal(rd$findings, ck$findings)
+  expect_equal(rd$summary, ck$summary)
+})

@@ -51,6 +51,6 @@ review_data <- function(study, asof) {
   asof <- as.Date(asof)
   dv <- derive_snapshot(study$tables, study$derivations, asof, study$schedule, study$thresholds)
   ck <- run_checks(study$tables, study$checks, asof, study$issues, study$schedule, study$thresholds,
-                   derivations = study$derivations)
+                   derivations = study$derivations, derived = dv)
   list(asof = asof, tables = dv$tables, adsl = dv$adsl, findings = ck$findings, summary = ck$summary)
 }

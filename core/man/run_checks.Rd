@@ -11,7 +11,8 @@ run_checks(
   issues = NULL,
   schedule = NULL,
   thresholds = list(),
-  derivations = NULL
+  derivations = NULL,
+  derived = NULL
 )
 }
 \arguments{
@@ -30,6 +31,9 @@ run_checks(
 
 \item{derivations}{Optional derivations from \code{\link[=define_derivations]{define_derivations()}}; when
 given, as-of checks see the derived snapshot and \code{ctx$adsl}.}
+
+\item{derived}{Optional result of \code{\link[=derive_snapshot]{derive_snapshot()}} for \code{asof}, when the
+caller has already derived it (saves deriving twice).}
 }
 \value{
 A list: \code{findings} (one row per finding; \code{FINDINGKEY} is

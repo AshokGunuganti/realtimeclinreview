@@ -116,7 +116,7 @@ spec_row_check <- function(r) {
     if (!is.null(form)) params$form <- form
     if (!is.null(when)) params$when <- when
     if (!is.null(field)) {
-      if (identical(type, "missing_value")) params$fields <- split_list(field)
+      if (identical(type, "missing_value") || identical(type, "future_date")) params$fields <- split_list(field)
       else if (identical(type, "visit_status")) params$date <- field
       else params$field <- field
     }
@@ -184,25 +184,28 @@ spec_date_text <- function(x) {
 #' @export
 check_spec_types <- function() {
   data.frame(
-    TYPE = c("record", "visit_status", "range", "missing_value", "date_order", "reconcile"),
+    TYPE = c("record", "visit_status", "future_date", "range", "missing_value", "date_order", "reconcile"),
     FLAGS = c("Every record of the form that meets WHEN (every record when WHEN is blank)",
               "Scheduled visits with a given status on the review date",
+              "Dates later than the data cut (the extract date), usually typing errors",
               "Values outside a range",
               "Fields left empty",
               "A date that is not after (or before) a reference date on another form",
               "A record with no matching record on another form, or dates that differ"),
-    FORM = c("Form to flag", "Visit form", "Form", "Form", "Form", "First form (form_a)"),
-    FIELD = c("Field shown as the finding's value", "Visit date field", "Field to test", "Field(s), comma-separated",
-              "Date field", ""),
-    WHEN = rep("Optional conditions, e.g. AESER == Y", 6),
+    FORM = c("Form to flag", "Visit form", "Form; blank for every form", "Form", "Form", "Form", "First form (form_a)"),
+    FIELD = c("Field shown as the finding's value", "Visit date field", "Date fields; blank for every date field",
+              "Field to test", "Field(s), comma-separated", "Date field", ""),
+    WHEN = c(rep("Optional conditions, e.g. AESER == Y", 2), "", rep("Optional conditions, e.g. AESER == Y", 4)),
     PARAMS = c("watch=fields whose change brings the flag back for review, e.g. watch=AESEV, AEOUT",
                "statuses=Missed, Overdue / not entered, Out of window; not_done=VISND == Yes; fallback=TRTSDT:PLANDY1",
+               "exclude=fields to leave out",
                "min=value or field; max=value or field",
                "",
                "ref_form=EX; ref_field=EXSTDAT; op=after (after, on_or_after, before, on_or_before)",
                "form_b=MCSS; by=SUBJID, VISITNUM; date_a=; date_b=; tolerance=0; schedule_flag=; when_b=; both_ways=TRUE"),
     EXAMPLE = c("New SAE: FORM AE, FIELD AETERM, WHEN AESER == Y",
                 "Missed visit: FORM SV, FIELD VISDAT, PARAMS statuses=Missed; not_done=VISND == Yes",
+                "Date after the data cut: FORM and FIELD blank",
                 "Missed doses in range: FORM DIARY, FIELD DOSMISS, PARAMS min=0; max=DOSPRESC",
                 "AE not coded: FORM AE, FIELD AEDECOD",
                 "Visit after first dose: FORM SV, FIELD VISDAT, WHEN VISITNUM > 2, PARAMS ref_form=EX; ref_field=EXSTDAT; op=after",
@@ -237,6 +240,8 @@ canned_checks <- function(changed_on = Sys.Date()) {
         owner = "safety"),
     row("AE-SEV", "Severe AE", "Adverse event of severe intensity", "Safety", "clinical", "record", "AE", "AETERM",
         when = "AESEV == SEVERE", params = "watch=AESER, AEREL, AEOUT", message = "Severe adverse event", owner = "safety"),
+    row("DT-FUT", "Date after the data cut", "A collected date later than the extract date, usually a typing error",
+        "Data", "data", "future_date", NA, NA, owner = "data management"),
     row("AE-COD", "AE not coded", "Adverse event entered but not yet coded", "Data", "data", "missing_value", "AE",
         "AEDECOD", message = "Awaiting coding", severity = "info", owner = "data management"),
     row("DS-DISC", "Subject discontinued", "Disposition other than completed", "Disposition", "clinical", "record",

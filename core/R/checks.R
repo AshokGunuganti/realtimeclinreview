@@ -206,6 +206,8 @@ finding_cols <- c("FINDINGKEY", "CHECKID", "SEVERITY", "OWNER", "SUBJID", "SITEI
 #' @param thresholds Named list of study thresholds, for `"$name"` parameters.
 #' @param derivations Optional derivations from [define_derivations()]; when
 #'   given, as-of checks see the derived snapshot and `ctx$adsl`.
+#' @param derived Optional result of [derive_snapshot()] for `asof`, when the
+#'   caller has already derived it (saves deriving twice).
 #' @return A list: `findings` (one row per finding; `FINDINGKEY` is
 #'   check + subject + anchor + field and is unique) and `summary` (one row
 #'   per check with its category, finding count and result). A check that
@@ -213,9 +215,12 @@ finding_cols <- c("FINDINGKEY", "CHECKID", "SEVERITY", "OWNER", "SUBJID", "SITEI
 #'   `not run` and the reason in `ERROR`; the other checks still run.
 #' @export
 run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thresholds = list(),
-                       derivations = NULL) {
+                       derivations = NULL, derived = NULL) {
   adsl <- NULL
-  if (is.null(derivations)) {
+  if (!is.null(derived)) {
+    snap <- derived$tables
+    adsl <- derived$adsl
+  } else if (is.null(derivations)) {
     snap <- lapply(tables, as_of, d = asof)
   } else {
     dv <- derive_snapshot(tables, derivations, asof, schedule, thresholds)
@@ -223,6 +228,8 @@ run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thr
     adsl <- dv$adsl
   }
   latest <- lapply(tables, function(t) if (nrow(t)) as_of(t, max(t$AVAILDT)) else t)
+  avail <- unlist(lapply(tables, function(t) as.numeric(as.Date(t$AVAILDT))))
+  cut <- if (length(avail) && any(!is.na(avail))) as.Date(max(avail, na.rm = TRUE), origin = "1970-01-01") else as.Date(asof)
   sites <- subject_sites(snap)
 
   found <- list()
@@ -230,7 +237,7 @@ run_checks <- function(tables, checks, asof, issues = NULL, schedule = NULL, thr
   for (chk in checks) {
     type <- get(chk$type, envir = check_type_registry, inherits = FALSE)
     ctx <- list(tables = if (chk$timing == "load") latest else snap, adsl = adsl, issues = issues,
-                schedule = schedule, asof = asof)
+                schedule = schedule, asof = asof, cut = cut)
     found[[chk$id]] <- tryCatch({
       params <- resolve_params(chk$params, thresholds, chk$id)
       complete_findings(type$fn(ctx, params), chk, ctx$tables, sites)
