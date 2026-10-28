@@ -121,7 +121,7 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
     output$workbook <- shiny::downloadHandler(
       filename = function() paste0(study$id, "_review_", format(asof(), "%Y%m%d"), ".xlsx"),
       content = function(file) {
-        review_workbook(ctx$data(), study, file, about_table(ctx), con)
+        review_workbook(ctx$data(), study, file, about_table(ctx), con, since = ctx$since())
         rtcrcore::log_access(con, study$id, who, "export", basename(file),
                              paste("review workbook as of", format(asof()), "site", ctx$site()))
       })

@@ -5,7 +5,7 @@ status_colours <- c("Complete" = "#b6dcb6", "Out of window" = "#fab219", "Overdu
                     "Missed" = "#d03b3b", "Not yet due" = "#e9e8e3", "Discontinued" = "#9d9c96")
 
 badge_class <- c(
-  "New" = "b-new", "Changed" = "b-chg", "Deleted" = "b-crit", "Unchanged" = "b-chg", "Persisting" = "b-chg",
+  "New" = "b-new", "Changed" = "b-upd", "Updated" = "b-upd", "Deleted" = "b-crit", "Unchanged" = "b-chg", "Persisting" = "b-chg",
   "Resolved" = "b-ok", "error" = "b-crit", "warning" = "b-warn", "info" = "b-new", "pass" = "b-ok",
   "reviewed" = "b-ok", "needs re-review" = "b-warn", "not reviewed" = "b-chg",
   "Complete" = "b-ok", "Out of window" = "b-warn", "Overdue / not entered" = "b-ser", "Missed" = "b-crit",
@@ -28,7 +28,7 @@ app_css <- "
   .kpi .sub{font-size:.78rem;color:#5f6673}
   .badge-s{display:inline-block;padding:.05rem .45rem;border-radius:4px;font-size:.72rem;font-weight:500;white-space:nowrap}
   .b-crit{background:#fdecea;color:#a1251b}.b-warn{background:#fff3d6;color:#6b4a00}.b-ser{background:#fde8df;color:#8a3a17}
-  .b-new{background:#eef2fa;color:#2459c9}.b-chg{background:#f1f2f4;color:#3b414c}.b-ok{background:#e7f4ec;color:#1f6b45}
+  .b-new{background:#dce8fb;color:#1d4fb3}.b-upd{background:#ffe9b3;color:#6b4a00}.b-chg{background:#f1f2f4;color:#3b414c}.b-ok{background:#e7f4ec;color:#1f6b45}
   .card{border-color:#e6e8ec;box-shadow:none}
   .card-header{background:#fff;border-bottom-color:#eef0f3;font-weight:600;font-size:.9rem;display:flex;
     justify-content:space-between;align-items:center;gap:.5rem}
@@ -102,8 +102,7 @@ app_css <- "
   .panel-tbl table{font-size:.8rem;margin-bottom:0;background:transparent}
   .panel-tbl th{white-space:nowrap;font-weight:500;color:#5f6673}
   .panel-tbl td:first-child{white-space:nowrap}
-  .panel-tbl tr.row-new td{background:#f2f5fb}
-  .panel-tbl mark{background:#fff3d6;padding:0 .15rem;border-radius:3px;cursor:help}
+
   .panel-h{margin:1.1rem 0 .4rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:#5f6673;font-weight:600}
   .panel-all summary{display:flex;justify-content:space-between;cursor:pointer;padding:.45rem 0;font-size:.88rem;
     border-bottom:1px solid #f0f1f4}
@@ -111,6 +110,20 @@ app_css <- "
   .panel-tl{margin-bottom:.8rem}
   .panel-tl .tl-axis{stroke:#e6e8ec}.panel-tl .tl-day1{stroke:#2459c9;stroke-dasharray:3 3}
   .panel-tl .tl-pt{fill:#9aa1ad}.panel-tl .tl-new{fill:#2459c9}.panel-tl .tl-lab{font-size:10px;fill:#5f6673}
+  .change-legend{display:flex;flex-wrap:wrap;gap:.3rem 1rem;font-size:.78rem;color:#5f6673;align-items:center}
+  .change-legend .sw{display:inline-block;width:14px;height:11px;border-radius:2px;margin-right:.35rem;vertical-align:-1px;
+    border:1px solid rgba(0,0,0,.08)}
+  .listing-tools{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.4rem 1rem;
+    margin-bottom:.5rem}
+  .listing-tools .form-group{margin-bottom:0}
+  .listing-tools .radio-inline,.listing-tools .form-check-inline{font-size:.84rem}
+  mark.upd{background:#ffcf5c;padding:0 .2rem;border-radius:3px;cursor:help;color:inherit}
+  tr.row-new td{background:#d9e8fc}
+  tr.row-upd td{background:#fff0c2}
+  tr.row-del td{background:#e6e8ec;text-decoration:line-through}
+  table.dataTable>tbody>tr[style*=background-color]:not(.selected)>*{box-shadow:none!important;
+    background-color:inherit!important}
+  .form-changes + .form-changes{margin-top:1.4rem}
   .kb-hint{font-size:.75rem;color:#5f6673;margin-left:auto}
 "
 
@@ -222,11 +235,18 @@ table_card_server <- function(id, data, ctx, sheet, mark_type = NULL, page_lengt
     output$tbl <- DT::renderDT({
       d <- data()
       hidden <- which(startsWith(names(d), ".")) - 1
-      DT::datatable(d, escape = FALSE, rownames = FALSE, selection = selection,
-                    options = list(pageLength = page_length, scrollX = TRUE, order = list(),
-                                   dom = if (nrow(d) > page_length) "ftip" else "ft",
-                                   columnDefs = list(list(visible = FALSE, targets = hidden)),
-                                   language = list(emptyTable = "No records.")))
+      dt <- DT::datatable(d, escape = FALSE, rownames = FALSE, selection = selection,
+                          options = list(pageLength = page_length, scrollX = TRUE, order = list(),
+                                         dom = if (nrow(d) > page_length) "ftip" else "ft",
+                                         columnDefs = list(list(visible = FALSE, targets = hidden)),
+                                         language = list(emptyTable = "No records.")))
+      # Rows with a record status (.RECSTAT) take its colour: new, updated, deleted.
+      if (".RECSTAT" %in% names(d)) {
+        dt <- DT::formatStyle(dt, ".RECSTAT", target = "row",
+                              backgroundColor = DT::styleEqual(names(change_colours), unname(change_colours)),
+                              textDecoration = DT::styleEqual("Deleted", "line-through"))
+      }
+      dt
     })
     output$xl <- shiny::downloadHandler(
       filename = function() paste0(gsub("[^A-Za-z0-9]+", "_", sheet), "_", format(ctx$asof(), "%Y%m%d"), ".xlsx"),

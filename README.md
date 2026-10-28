@@ -28,7 +28,7 @@ renv::install(c("./core", "./app"))
 rtcrapp::run_app("studies/example")     # screens come from study.yml `displays`
 ```
 
-The app opens on **My review**, an inbox: subjects with new or changed data since your last sign-off, or a new clinical flag, on the left; the selected subject, new data first, on the right. Press **Reviewed, next** (or the m key) to mark it and move on. Every other screen is one click away in the sidebar; clicking a subject anywhere opens it in a side panel. Review date, changes since, site and a subject search sit above every screen.
+The app opens on **My review**, an inbox: subjects with new or changed data since your last sign-off, or a new clinical flag, on the left; the selected subject, new data first, on the right. Press **Reviewed, next** (or the m key) to mark it and move on. **New and updated data** lists the monitored forms with new records in blue and updated records in amber, each changed value highlighted (hover for the earlier value); every listing and the Excel workbook use the same colours. Every other screen is one click away in the sidebar; clicking a subject anywhere opens it in a side panel. Review date, changes since, site and a subject search sit above every screen.
 
 Review checks (new and changed AEs, SAEs, low compliance, missed and overdue visits, study rules and data issues) are rows in `studies/<study>/check_spec.xlsx`, which the review team edits: add a row, change a condition, or set STATUS to retired. New studies start from the canned set (`rtcrcore::write_check_spec()`). Programmer checks on loading and mapping always run and show only on the Data load page.
 

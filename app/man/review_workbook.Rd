@@ -4,7 +4,7 @@
 \alias{review_workbook}
 \title{Review workbook}
 \usage{
-review_workbook(rd, study, file, about, con = NULL)
+review_workbook(rd, study, file, about, con = NULL, since = NULL)
 }
 \arguments{
 \item{rd}{Review data from \code{\link[rtcrcore:review_data]{rtcrcore::review_data()}}, filtered to the site.}
@@ -16,6 +16,9 @@ review_workbook(rd, study, file, about, con = NULL)
 \item{about}{Data frame (\code{Item}, \code{Value}) for the About sheet.}
 
 \item{con}{Review store, for review status; \code{NULL} leaves it out.}
+
+\item{since}{Earlier date for new and updated records; \code{NULL} leaves the
+monitored data sheets out.}
 }
 \value{
 \code{file}, invisibly.
@@ -32,6 +35,10 @@ programmers, on the app's Data load page.
 \item \strong{One sheet per check}: what the check does, then its findings with
 review status, filterable. Checks with no findings get a sheet too, so
 the workbook shows what was checked as well as what was found.
+\item \strong{One sheet per monitored form} (with \code{since}): every record on the
+review date plus records deleted since \code{since}, coloured by status as in
+the 2017 workbook (new, updated, deleted), changed values highlighted and
+listed as earlier -> new value.
 \item \strong{Patient profile}: subject-level data (ADSL) and every record of every
 clinical form, one row per field, with record status and review marks;
 derived fields are labelled.

@@ -155,12 +155,16 @@ panel_body <- function(ctx, s, timeline = list()) {
     x <- chg[chg$FORMOID == f, , drop = FALSE]
     n <- table(factor(x$RECSTAT, levels = c("New", "Changed", "Deleted")))
     n <- n[n > 0]
+    lab <- status_label(names(n))
     sections[[paste0("chg_", f)]] <- panel_section(
-      f, paste(badge(sprintf("%d %s", as.integer(n), tolower(names(n)))), collapse = " "), TRUE,
+      f, paste(sprintf('<span class="badge-s %s">%d %s</span>', badge_class[lab], as.integer(n), tolower(lab)),
+               collapse = " "), TRUE,
       changed_records(ctx, f, s, x, since))
   }
   if (!nrow(chg) && !nrow(fresh)) {
-    sections$none <- shiny::p(class = "note", sprintf("No new or changed data since %s.", fmt_date(since)))
+    sections$none <- shiny::p(class = "note", sprintf("No new or updated data since %s.", fmt_date(since)))
+  } else if (nrow(chg)) {
+    sections$legend <- change_legend()
   }
   if (!is.null(q) && nrow(q)) {
     sections$q <- panel_section("Unresolved queries", badge(sprintf("%d open", nrow(q))), FALSE, html_table(
@@ -182,10 +186,10 @@ panel_body <- function(ctx, s, timeline = list()) {
     t <- rd$tables[[f]]
     t <- t[t$SUBJID == s, , drop = FALSE]
     if (!nrow(t)) return(NULL)
-    new <- chg$RECID[chg$FORMOID == f]
+    st <- chg$RECSTAT[chg$FORMOID == f][match(t$RECID, chg$RECID[chg$FORMOID == f])]
     shiny::tags$details(class = "panel-all",
                         shiny::tags$summary(shiny::span(f), shiny::span(class = "note", sprintf("%d record(s)", nrow(t)))),
-                        html_table(record_cells(t), row_class = ifelse(t$RECID %in% new, "row-new", "")))
+                        html_table(record_cells(t), row_class = row_classes(st)))
   })
   shiny::tagList(
     sections,
@@ -200,28 +204,22 @@ panel_section <- function(title, right, is_new, content) {
              content)
 }
 
-# New, changed and deleted records of one form for one subject. Changed cells
-# are highlighted and show the earlier value on hover.
+# New, updated and deleted records of one form for one subject, coloured by
+# status; changed values are marked and show the earlier value on hover.
 changed_records <- function(ctx, form, s, x, since) {
-  rd <- ctx$data()
-  t <- rd$tables[[form]]
-  live <- t[t$SUBJID == s & t$RECID %in% x$RECID, , drop = FALSE]
-  gone <- x[x$RECSTAT == "Deleted", , drop = FALSE]
-  cells <- record_cells(live)
-  cf <- rtcrcore::change_fields(ctx$study$tables[[form]], since, ctx$asof())
-  cf <- cf[cf$RECID %in% live$RECID, , drop = FALSE]
-  for (i in seq_len(nrow(cf))) {
-    r <- match(cf$RECID[i], live$RECID)
-    v <- cf$VARIABLE[i]
-    if (!v %in% names(cells)) next
-    cells[[v]][r] <- sprintf('<mark title="was: %s">%s</mark>', htmltools::htmlEscape(cf$OLD[i]), cells[[v]][r])
-  }
-  status <- x$RECSTAT[match(live$RECID, x$RECID)]
-  cells <- cbind(data.frame(Status = badge(status), stringsAsFactors = FALSE), cells)
-  shiny::tagList(
-    html_table(cells),
-    if (nrow(gone)) shiny::p(class = "note", paste("Deleted:", paste(gone$RECID, collapse = ", ")))
-  )
+  fc <- form_changes(ctx$study, ctx$data(), form, since, ctx$asof())
+  keep <- fc$rows$SUBJID == s & fc$rows$RECID %in% x$RECID
+  t <- fc$rows[keep, , drop = FALSE]
+  st <- fc$status[keep]
+  cells <- mark_changed_cells(record_cells(t), t$RECID, fc$fields)
+  cells <- cbind(data.frame(Status = badge(status_label(st)), stringsAsFactors = FALSE), cells)
+  html_table(cells, row_class = row_classes(st))
+}
+
+row_classes <- function(status) {
+  out <- unname(c(New = "row-new", Changed = "row-upd", Deleted = "row-del")[status])
+  out[is.na(out)] <- ""
+  out
 }
 
 # Display cells for records: collected and derived fields, header fields left out.

@@ -136,7 +136,8 @@ test_that("the panel shows clinical flags and highlights changed values", {
     ch <- ctx$changes()
     s <- ch$SUBJID[ch$RECSTAT == "Changed"][1]
     html <- as.character(panel_body(ctx, s, list()))
-    expect_match(html, '<mark title="was: ')
+    expect_match(html, '<mark class="upd" title="was: ')
+    expect_match(html, 'class="row-upd"')
     expect_match(as.character(panel_head(ctx, s)), s)
   })
 })
@@ -249,4 +250,77 @@ test_that("the queue holds clinical flags new in the window, not every open flag
     all_open <- queue_items(ctx$changes(), clinical_findings(ctx$data()), ctx$con, ctx$study$id)
     expect_gt(sum(all_open$TYPE == "finding"), nrow(flags))
   })
+})
+
+test_that("listings colour records new, updated and deleted, with changed values marked", {
+  ctx <- test_ctx()
+  shiny::testServer(listing_server, args = list(ctx = ctx, params = list(form = "MCSS")), {
+    x <- tbl()
+    expect_true(all(x$.RECSTAT %in% c("New", "Changed", "Deleted", "Unchanged")))
+    expect_true(any(x$.RECSTAT == "Changed"))
+    upd <- x[x$.RECSTAT == "Changed", ]
+    expect_match(upd$Status[1], "Updated")
+    expect_true(any(grepl('<mark class="upd" title="was: ', unlist(upd))))
+    n_all <- nrow(x)
+    session$setInputs(show = "changes")
+    y <- tbl()
+    expect_true(all(y$.RECSTAT != "Unchanged"))
+    expect_lt(nrow(y), n_all)
+    expect_equal(session$getReturned()$n_changes(), nrow(y))
+  })
+  fc <- shiny::isolate(form_changes(ctx$study, ctx$data(), "MCSS", ctx$since(), ctx$asof()))
+  expect_equal(length(fc$status), nrow(fc$rows))
+  expect_equal(changed_text("x", data.frame(RECID = "x", VARIABLE = "AESEV", OLD = "MILD", NEW = "SEVERE")),
+               "AESEV: MILD → SEVERE")
+})
+
+test_that("deleted records come back struck through until the window passes", {
+  ctx <- test_ctx()
+  st <- ctx$study
+  ae <- st$tables$AE
+  v <- ae[1, ]
+  if (is.null(ae$DELFL)) ae$DELFL <- FALSE
+  v <- ae[1, ]
+  v$DELFL <- TRUE
+  v$VERSION <- v$VERSION + 1
+  v$AVAILDT <- as.POSIXct("2026-12-01", tz = "UTC")
+  st$tables$AE <- rbind(ae, v)
+  rd <- shiny::isolate(ctx$data())
+  rd$tables$AE <- rd$tables$AE[rd$tables$AE$RECID != ae$RECID[1], ]
+  fc <- form_changes(st, rd, "AE", as.Date("2026-10-22"), as.Date("2026-12-31"))
+  expect_equal(fc$status[fc$rows$RECID == ae$RECID[1]], "Deleted")
+  expect_equal(row_classes(c("New", "Changed", "Deleted", "Unchanged")), c("row-new", "row-upd", "row-del", ""))
+})
+
+test_that("the new and updated data screen lists only forms with changes", {
+  ctx <- test_ctx()
+  shiny::testServer(monitored_server, args = list(ctx = ctx, params = list(forms = list("AE", "MCSS", "EX"))), {
+    session$flushReact()
+    expect_equal(output$has_AE, "yes")
+    expect_equal(output$has_MCSS, "yes")
+    expect_equal(output$has_EX, "no")                                     # no new or updated dosing starts
+    expect_equal(output$any, "yes")
+    expect_match(output$summary$html, "new, \\d+ updated")
+  })
+  expect_equal(monitored_forms(example_study())[1:3], c("AE", "PK", "MCSS"))
+})
+
+test_that("the workbook has a coloured sheet per monitored form", {
+  ctx <- test_ctx()
+  rd <- shiny::isolate(ctx$data())
+  path <- withr::local_tempfile(fileext = ".xlsx")
+  review_workbook(rd, ctx$study, path, shiny::isolate(about_table(ctx)), ctx$con, since = as.Date("2026-10-22"))
+  sheets <- openxlsx::getSheetNames(path)
+  expect_true(all(paste("Data", monitored_forms(ctx$study)) %in% sheets))
+  d <- openxlsx::read.xlsx(path, "Data MCSS", startRow = 4)
+  expect_equal(d$Status[1], "New")                                        # new first, then updated
+  expect_true("Updated" %in% d$Status)
+  expect_match(d$Changed[d$Status == "Updated"][1], "→")
+  wb <- openxlsx::loadWorkbook(path)
+  fills <- vapply(wb$styleObjects, function(s) if (s$sheet == "Data MCSS") s$style$fill$fillFg[[1]] %||% "" else "", "")
+  expect_true(any(grepl("D9E8FC", fills, ignore.case = TRUE)))            # new
+  expect_true(any(grepl("FFF0C2", fills, ignore.case = TRUE)))            # updated
+  expect_true(any(grepl("FFCF5C", fills, ignore.case = TRUE)))            # changed value
+  toc <- openxlsx::read.xlsx(path, "Contents", colNames = FALSE, skipEmptyRows = FALSE)
+  expect_true(any(grepl("Monitored data", toc[[1]])))
 })

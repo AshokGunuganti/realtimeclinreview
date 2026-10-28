@@ -23,7 +23,7 @@ test_that("the example study's app builds with every configured screen", {
   displays <- resolve_displays(st$config$displays, review_cache(st)(st$extract_date))
   expect_equal(length(displays), length(st$config$displays))
   html <- as.character(app_ui(st, displays, st$config$app, c("101", "102")))
-  for (t in c("My review", "Record changes", "Visit status", "mCSS over time", "AE listing", "Data checks",
+  for (t in c("My review", "New and updated data", "Visit status", "mCSS over time", "AE listing", "Data checks",
               "Clinical flags", "Subject profile", "Sites", "AE coding", "Lock readiness", "Sign-off", "Audit trail")) {
     expect_match(html, t)
   }

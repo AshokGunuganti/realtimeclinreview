@@ -97,9 +97,10 @@ app:
   simulated: true
   queries: QUERY              # query report: query status on listings, sites, queries and lock readiness
   priority: [AE, PK, MCSS]    # in the review queue, subjects with changes to these forms come first
+  monitored: [AE, PK, MCSS, IGA, DIARY, SV, EX, DS, DM]   # listed with new and updated records coloured
 displays:
   - {id: review, module: review_queue, title: My review}
-  - {id: changes, module: whats_new, title: All changes, params: {priority: [AE, PK, MCSS]}}
+  - {id: changes, module: monitored_changes, title: New and updated data}
 
   # Subjects
   - {id: subjects, module: subject_list, title: Subject list, group: Subjects}
