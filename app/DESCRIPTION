@@ -1,0 +1,30 @@
+Package: rtcrapp
+Title: Shiny Display Modules for Real-Time Clinical Data Review
+Version: 0.0.0.9000
+Authors@R: 
+    person("Ashok", "Gunuganti", , "agunuganti@gmail.com", role = c("aut", "cre"))
+Description: Generic Shiny display modules driven by form types and study configuration (study.yml displays), presenting results computed by the core package: what changed, visit status, over-time charts, timelines, listings, check results and subject profiles, with review marks and Excel export.
+License: Apache License (>= 2)
+Config/roxygen2/version: 8.1.1
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends:
+    R (>= 4.4.0)
+Suggests: 
+    ellmer (>= 0.5.0),
+    promises,
+    RSQLite,
+    shinychat (>= 0.5.0),
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
+Imports: 
+    bslib,
+    DBI,
+    DT,
+    htmltools,
+    jsonlite,
+    openxlsx,
+    plotly,
+    rtcrcore,
+    shiny

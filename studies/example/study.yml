@@ -1,0 +1,247 @@
+# Example study: SIMULATED single-arm rare-dermatology trial (no real data).
+schema_version: 1
+study_id: DERM-301-SIM
+visit_schedule: visit_schedule.csv
+mapping_spec: mapping_spec.xlsx
+extracts: extracts
+test_sites: ["999"]
+# Review marks, sign-offs and audit trail. SQLite for demos; postgres for team use.
+review_store:
+  driver: sqlite
+  path: review_state.sqlite
+# Review thresholds (used by later steps: derivations, checks, displays)
+thresholds:
+  pk_alert: 1.5          # ng/mL
+  pk_limit: 2.0          # ng/mL systemic exposure threshold
+  lloq: 0.1              # ng/mL
+  compliance: 80         # %
+  entry_lag_target: 5    # days
+  min_n: 3
+
+# Review checks: the check spec workbook the review team edits (canned set
+# plus study checks; see its How to sheet). Programmer checks on loading and
+# mapping always run and show only on the Data load page.
+check_spec: check_spec.xlsx
+
+# Column headings for derived variables (mapped variables take theirs from
+# the LABEL column of the mapping spec). Unlabelled columns show their name.
+labels:
+  ENRLDT: Enrollment date
+  TRTSDT: First dose date
+  PLANDY1: Planned Day 1
+  LSTCNTDT: Last contact date
+  EOSSTT: Subject status
+  EOSDT: End of study date
+  DCSREAS: Reason for discontinuation
+  ASTDT: Start date (imputed)
+  ASTDTF: Start date imputation
+  ASTDY: Start study day
+  ADY: Study day
+  TRTEMFL: Treatment emergent
+  WORSTFL: Worst severity
+  APERIODC: Period
+  AVISIT: Analysis visit
+  AVISITN: Analysis visit number
+  ATDIFF: Days from target
+  AWINFL: In visit window
+  DOSAPPL: Doses applied
+  COMPPCT: Compliance (%)
+  ABLFL: Baseline record
+  BASE: Baseline value
+  BASESRC: Baseline source
+  APOSTFL: Post-baseline record
+  CHG: Change from baseline
+  PCHG: Percent change from baseline
+  AVAL: Analysis value
+  PCBLQFL: Below limit of quantitation
+
+# Data pulls before the study database held every cut: the simulated study had
+# ten transfers, about every six weeks, the last being the loaded extract.
+# Loaded cuts or extract folders are added to these. The subject profile marks
+# each pull. A regular schedule can be given instead as {start, every_days}.
+data_pulls:
+  dates: [2026-01-14, 2026-02-25, 2026-04-08, 2026-05-20, 2026-07-01, 2026-08-12, 2026-09-23, 2026-11-04, 2026-12-09]
+
+# AI assistant ("Ask the data"): Claude answers questions on the review data
+# through read-only tools. Needs ANTHROPIC_API_KEY on the server. Verbatim free
+# text (*TERM, *TXT, *TEXT, *COMM fields and those below) is withheld from the
+# model unless listed under share_free_text. Questions and tool calls go to the
+# access log.
+assistant:
+  enabled: true
+  row_cap: 50
+  free_text: [SV.VISNDRS]     # reason a visit was not done
+  share_free_text: []
+
+# Standard derivations, run in order on the as-of snapshot.
+derivations:
+  - id: REF
+    type: reference_dates
+    description: Enrollment, first dose and last contact per subject
+    params:
+      subject_form: DM
+      dates:
+        - {name: ENRLDT, from: [{form: DM, field: ENRLDAT}]}
+        - {name: TRTSDT, from: [{form: EX, field: EXSTDAT}]}
+        - {name: PLANDY1, offset: 56, from: [{form: DM, field: ENRLDAT}]}   # planned Day 1 after 8-week run-in
+        - {name: LSTCNTDT, pick: last, from: [{form: SV, field: VISDAT}, {form: MCSS, field: PHOTODT}]}
+  - id: STATUS
+    type: subject_status
+    description: Ongoing, completed, discontinued or screen failure from disposition
+    params: {form: DS, field: DSDECOD, date: DSSTDAT, completed: COMPLETED, screen_failure: SCREEN FAILURE}
+  - id: AE-IMPUTE
+    type: impute_date
+    description: Complete partial AE start dates for derivations; never before first dose in the same month
+    params: {form: AE, field: AESTDAT, to: ASTDT, rule: first, not_before: TRTSDT}
+  - id: STUDY-DAY
+    type: study_day
+    description: Study day from first dose, no day 0
+    params:
+      items:
+        - {form: AE, field: ASTDT, to: ASTDY}
+        - {form: SV, field: VISDAT, to: ADY}
+  - id: TEAE
+    type: treatment_emergent
+    description: AE starting on or after first dose
+    params: {form: AE, start: ASTDT}
+  - id: PERIOD
+    type: period
+    description: Screening, run-in or treatment
+    params:
+      boundaries:
+        - {name: Run-in, from: ENRLDT}
+        - {name: Treatment, from: TRTSDT}
+      items:
+        - {form: SV, field: VISDAT}
+        - {form: AE, field: ASTDT}
+  - id: AVISIT
+    type: analysis_visit
+    description: Window flag for each visit; unscheduled visits go to the nearest nominal visit
+    params: {form: SV, field: VISDAT, keep_scheduled: true}
+  - id: MCSS-BASE
+    type: baseline
+    description: mCSS baseline is the last central read on or before first dose
+    params: {form: MCSS, value: MCSS, date: PHOTODT, rule: last_before_ref}
+  - id: COMPLIANCE
+    type: compliance
+    description: Dosing compliance per diary interval
+    params: {form: DIARY, prescribed: DOSPRESC, missed: DOSMISS}
+  - id: PK
+    type: pk_timing
+    description: Analysis value with BLQ results set to missing
+    params: {form: PK, value: PCSTRESN, blq_flag: PCBLQFL, blq_rule: missing, lloq: PCLLOQ}
+  - id: WORST-AE
+    type: worst
+    description: Most severe treatment-emergent AE per subject
+    params:
+      form: AE
+      field: AESEV
+      order: [MILD, MODERATE, SEVERE]
+      when: [{field: TRTEMFL, op: "==", value: "Y"}]
+
+# Review app. Screens appear in the sidebar in this order, under their group's
+# heading; ungrouped screens come first. A screen is left out when its data is
+# not in the study.
+app:
+  review_type: medical        # sign-off type that sets the default "changes since" date
+  simulated: true
+  queries: QUERY              # query report: query status on listings, sites, queries and lock readiness
+  priority: [AE, PK, MCSS]    # in the review queue, subjects with changes to these forms come first
+  monitored: [AE, PK, MCSS, IGA, DIARY, SV, EX, DS, DM]   # listed with new and updated records coloured
+# Study team: the people actions can be assigned to. Added to the review store
+# on first start; after that the team is kept in the app (Study team screen).
+# Members without a login own actions but cannot sign in. Simulated roles only.
+team:
+  - {id: dm, name: Data manager, role: Data manager}
+  - {id: mm, name: Medical monitor, role: Medical monitor}
+  - {id: lead-cra, name: Lead CRA, role: CRA}
+  - {id: cra113, name: Site 113 CRA, role: CRA}
+  - {id: safety, name: Safety physician, role: Safety}
+  - {id: sm, name: Study manager, role: Study manager}
+displays:
+  - {id: actions, module: action_log, title: Action items}
+  # My review (module review_queue) is left out for now; add it back here.
+  # The high-level view: new and updated data across every clinical form, then the checks by area.
+  - {id: summary, module: review_summary, title: Review summary, params: {exclude_tiers: [structural]}}
+  # The implemented checks, as the check spec describes them; each opens the tab for its form.
+  - {id: checks, module: check_catalogue, title: Checks}
+  # One subject at a glance; reviewers choose what it shows.
+  - id: profile
+    module: subject_profile
+    title: Subject profile
+    highlight: true     # stands out in the sidebar: the reviewer's own view of one subject
+    params:
+      facts:
+        - {form: DM, field: SEX}
+        - {form: DM, field: AGE}
+        - {form: EX, field: EXTRT}
+      lanes:
+        - {type: visits, form: SV, day: ADY, label: FOLDER, title: Visits, not_done: {field: VISND, value: "Yes"}}
+        - type: events
+          form: AE
+          day: ASTDY
+          label: AEDECOD
+          level: AESEV
+          title: Adverse events
+          ongoing: {field: AEOUT, values: [NOT RECOVERED/NOT RESOLVED, RECOVERING/RESOLVING]}
+          serious: {field: AESER, value: "Y"}
+        - {type: series, form: MCSS, date: PHOTODT, value: MCSS, title: mCSS total, note: central read, ref: BASE, ref_label: baseline}
+        - {type: series, form: IGA, date: IGADAT, value: IGASCORE, title: IGA change, note: higher is better, ref: 0, ref_label: no change}
+        - {type: intervals, form: DIARY, start: DRYSTDAT, end: DRYENDAT, value: COMPPCT, unit: "%", title: Dosing compliance, note: "diary, % of doses", ref: compliance, ref_label: target}
+        - {type: series, form: PK, date: PCDTC, value: PCSTRESN, below: PCBLQFL, title: PK concentration, note: ng/mL, ref: lloq, ref_label: LLOQ}
+
+  # Study conduct
+  - {id: subjects, module: subject_list, title: Subject list, group: Study conduct}
+  - id: visits
+    module: visit_grid
+    title: Visit status
+    group: Study conduct
+    params: &visits
+      form: SV
+      date: VISDAT
+      not_done: {field: VISND, value: "Yes"}
+      fallback: {TRTSDT: PLANDY1}
+  # Safety
+  - id: ae
+    module: stack
+    title: Adverse events
+    group: Safety
+    params:
+      items:
+        - {module: timeline, title: AE timeline, params: {form: AE, day: ASTDY, label: AETERM, color: AESEV}}
+        - {module: listing, title: AE listing, params: {form: AE}}
+  - {id: pk, module: listing, title: PK, group: Safety, params: {form: PK}}
+  - {id: diary, module: listing, title: Dosing diary, group: Safety, params: {form: DIARY}}
+
+  # Efficacy
+  - id: mcss
+    module: stack
+    title: mCSS (central read)
+    group: Efficacy
+    params:
+      items:
+        - {module: over_time, title: mCSS over time, params: {form: MCSS, value: MCSS, shade: [1], min_n: 3, y_label: mCSS total}}
+        - {module: over_time, title: mCSS change from baseline, params: {form: MCSS, value: CHG, min_n: 3, y_label: Change from baseline}}
+  - id: iga
+    module: over_time
+    title: IGA
+    group: Efficacy
+    params: {form: IGA, value: IGASCORE, min_n: 3, y_label: IGA (change score)}
+
+  # Data quality
+  - {id: queries, module: query_list, title: Queries, group: Data quality, params: {form: QUERY, query_age: 30}}
+  - id: coding
+    module: coding_review
+    title: AE coding
+    group: Data quality
+    params: {form: AE, verbatim: AETERM, coded: AEDECOD, soc: AESOC, version: MEDDRAV, date: AECODDT}
+
+  # Operations
+  - {id: sites, module: site_scorecard, title: Sites, group: Operations, params: {visits: *visits, query_age: 30, form_status: FSTAT}}
+  - {id: lock, module: lock_readiness, title: Lock readiness, group: Operations, params: {form_status: FSTAT}}
+  - {id: team, module: study_team, title: Study team, group: Operations}
+
+  # Close-out
+  - {id: signoff, module: sign_off, title: Sign-off, group: Close-out}
+  - {id: audit, module: audit_trail, title: Audit trail, group: Close-out}
+  - {id: load, module: data_load, title: Data load, group: Close-out}

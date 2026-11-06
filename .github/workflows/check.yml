@@ -1,0 +1,59 @@
+# Checks both packages and runs every test suite on each push and pull
+# request, with the package versions recorded in renv.lock.
+name: R checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    env:
+      _R_CHECK_FORCE_SUGGESTS_: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: renv
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-renv@v2
+
+      - name: Use the renv library for R CMD
+        run: echo "R_LIBS=$(Rscript -e 'cat(.libPaths()[1])')" >> "$GITHUB_ENV"
+
+      # R CMD check runs the tests from a copy of the package, where the
+      # example study is out of reach; the test steps below run them in place.
+      - name: R CMD check rtcrcore
+        run: |
+          mkdir -p check
+          R CMD build --no-build-vignettes core
+          R CMD check --no-manual --output=check rtcrcore_*.tar.gz
+          grep -q "Status: OK" check/rtcrcore.Rcheck/00check.log
+
+      - name: Install rtcrcore
+        run: R CMD INSTALL core
+
+      - name: R CMD check rtcrapp
+        run: |
+          R CMD build --no-build-vignettes app
+          R CMD check --no-manual --output=check rtcrapp_*.tar.gz
+          grep -q "Status: OK" check/rtcrapp.Rcheck/00check.log
+
+      - name: Tests with the example study
+        run: |
+          Rscript -e 'pkgload::load_all("core"); testthat::test_dir("core/tests/testthat", load_package = "none", stop_on_failure = TRUE)'
+          Rscript -e 'pkgload::load_all("app"); testthat::test_dir("app/tests/testthat", load_package = "none", stop_on_failure = TRUE)'
+          Rscript -e 'testthat::test_dir("prototype/tests/testthat", stop_on_failure = TRUE)'
+
+      - name: Keep check logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-logs
+          path: check/*.Rcheck/00*.log
