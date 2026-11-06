@@ -148,7 +148,9 @@ test_that("views and exports go to the access log", {
   l <- access_log(con, "S1")
   expect_equal(l$OBJECT, "review_workbook.xlsx")
   expect_equal(nrow(audit_trail(con, "S1")), 0)
-  expect_error(log_access(con, "S1", "alice", "print", "x"), "view or export")
+  expect_error(log_access(con, "S1", "alice", "print", "x"), "view, export or assistant")
+  log_access(con, "S1", "alice", "assistant", "question", "Which subjects have severe AEs?")
+  expect_equal(tail(access_log(con, "S1")$ACTION, 1), "assistant")
 })
 
 test_that("compare_findings classifies new, changed, persisting and resolved", {

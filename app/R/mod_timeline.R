@@ -1,5 +1,6 @@
 # Event timeline: log-form events by study day, one row per subject, coloured
-# by a chosen field. Params: form, day, label, color, title.
+# by a chosen field (severities take the severity colours, other fields the
+# series palette; see palette.R). Params: form, day, label, color, title.
 
 timeline_ui <- function(id, params, study) {
   ns <- shiny::NS(id)
@@ -22,8 +23,10 @@ timeline_server <- function(id, ctx, params) {
     })
     output$plot <- plotly::renderPlotly({
       d <- events()
-      p <- plotly::plot_ly(d, x = ~DAY, y = ~SUBJID, color = ~COLOR, type = "scatter", mode = "markers",
-                           marker = list(size = 9), text = ~paste0(SUBJID, ": ", LABEL, " (day ", DAY, ")"),
+      cols <- category_colours(d$COLOR)
+      d$COLOR <- factor(d$COLOR, names(cols))
+      p <- plotly::plot_ly(d, x = ~DAY, y = ~SUBJID, color = ~COLOR, colors = unname(cols), type = "scatter",
+                           mode = "markers", marker = list(size = 11, line = list(color = "#f8fafb", width = 1.5)), text = ~paste0(SUBJID, ": ", LABEL, " (day ", DAY, ")"),
                            hoverinfo = "text", customdata = ~SUBJID, source = session$ns("tl"))
       p <- plotly::layout(p, xaxis = list(title = "Study day", zeroline = TRUE),
                           yaxis = list(title = "", type = "category", categoryorder = "category descending"),

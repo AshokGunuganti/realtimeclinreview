@@ -39,7 +39,7 @@ catalogue_server <- function(id, ctx, params) {
         x <- g[[area]]
         bslib::accordion_panel(
           value = area,
-          title = shiny::div(class = "act-group", shiny::span(class = "act-count", nrow(x)),
+          title = shiny::div(class = "act-group", style = area_style(area), shiny::span(class = "act-count", nrow(x)),
                              shiny::span(class = "act-gtitle", area),
                              shiny::span(class = paste("note", if (sum(x$New)) "late"), group_summary(x))),
           shiny::tagList(lapply(seq_len(nrow(x)), function(i) catalogue_row(x[i, ], ns))))

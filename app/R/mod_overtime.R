@@ -1,7 +1,8 @@
 # Over-time chart: a parameter by visit, with individual subject lines and the
 # mean with a 95% confidence interval where at least `min_n` values exist.
 # Params: form, value, title, y_label, shade (visit numbers to shade, e.g. run-in),
-# min_n (default 3), band (list(lo, hi) reference band).
+# min_n (default 3), band (list(lo, hi) reference band), colour (defaults to the
+# form's lane colour in the subject profile; see palette.R).
 
 overtime_ui <- function(id, params, study) {
   ns <- shiny::NS(id)
@@ -16,6 +17,7 @@ overtime_ui <- function(id, params, study) {
 overtime_server <- function(id, ctx, params) {
   shiny::moduleServer(id, function(input, output, session) {
     min_n <- if (is.null(params$min_n)) 3 else as.numeric(params$min_n)
+    colour <- params$colour %||% form_colour(ctx$study, params$form)
     sched <- ctx$study$schedule
     vis_label <- function(v) {
       l <- if ("VISIT" %in% names(sched)) sched$VISIT[match(v, sched$VISITNUM)] else NA
@@ -42,25 +44,32 @@ overtime_server <- function(id, ctx, params) {
       shapes <- lapply(intersect(as.numeric(unlist(params$shade)), xs), function(v) {
         i <- match(v, xs)
         list(type = "rect", xref = "x", yref = "paper", x0 = i - 0.5, x1 = i + 0.5, y0 = 0, y1 = 1,
-             fillcolor = "#ecebe7", opacity = 0.6, line = list(width = 0), layer = "below")
+             fillcolor = "#edf1f4", opacity = 0.6, line = list(width = 0), layer = "below")
       })
       if (!is.null(params$band)) {
         shapes[[length(shapes) + 1]] <- list(type = "rect", xref = "paper", x0 = 0, x1 = 1, y0 = params$band$lo,
-                                             y1 = params$band$hi, fillcolor = "#e4f3e4", opacity = 0.5,
+                                             y1 = params$band$hi, fillcolor = "#e3f3e6", opacity = 0.5,
                                              line = list(width = 0), layer = "below")
       }
       p <- plotly::plot_ly()
       if (nrow(d)) {
         p <- plotly::add_lines(p, data = d[order(d$SUBJID, d$X), ], x = ~X, y = ~Y, split = ~SUBJID,
-                               line = list(color = "rgba(138,137,131,0.35)", width = 1), hoverinfo = "text",
+                               line = list(color = rgba(colour, 0.22), width = 1.2), hoverinfo = "text",
                                text = ~paste(SUBJID, Y), showlegend = FALSE)
       }
       s <- s[s$N >= min_n, , drop = FALSE]
+      ci <- s[!is.na(s$LO), , drop = FALSE]
+      if (nrow(ci) > 1) {
+        p <- plotly::add_ribbons(p, data = ci, x = ~X, ymin = ~LO, ymax = ~HI, fillcolor = rgba(colour, 0.16),
+                                 line = list(width = 0), hoverinfo = "skip", showlegend = FALSE)
+      }
       if (nrow(s)) {
         p <- plotly::add_trace(p, data = s, x = ~X, y = ~MEAN, type = "scatter", mode = "lines+markers",
-                               line = list(color = "#0f5e57", width = 3), marker = list(color = "#0f5e57", size = 8),
+                               line = list(color = colour, width = 3.5),
+                               marker = list(color = colour, size = 10, line = list(color = "#f8fafb", width = 2)),
                                error_y = list(type = "data", symmetric = FALSE, array = s$HI - s$MEAN,
-                                              arrayminus = s$MEAN - s$LO, color = "#0f5e57"),
+                                              arrayminus = s$MEAN - s$LO, color = rgba(colour, 0.55), thickness = 1.5,
+                                              width = 4),
                                name = sprintf("Mean (95%% CI, n >= %d)", min_n), hoverinfo = "text",
                                text = ~sprintf("%s: mean %.2f, n = %d", vis_label(VISITNUM), MEAN, N))
       }

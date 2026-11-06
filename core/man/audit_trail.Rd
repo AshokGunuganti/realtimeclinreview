@@ -19,9 +19,11 @@ access_log(con, study)
 
 \item{user}{User ID (from the app's single sign-on).}
 
-\item{action}{\code{"view"} or \code{"export"}.}
+\item{action}{\code{"view"}, \code{"export"} or \code{"assistant"} (a question to the
+review app's AI assistant, or a tool it called to answer one).}
 
-\item{object}{What was viewed or exported, e.g. a screen or file name.}
+\item{object}{What was viewed or exported, e.g. a screen or file name, or
+the assistant tool.}
 
 \item{detail}{Optional detail, e.g. filters or the data cut.}
 }

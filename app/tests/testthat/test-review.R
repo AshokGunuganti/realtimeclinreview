@@ -318,9 +318,9 @@ test_that("the workbook has a coloured sheet per monitored form", {
   expect_match(d$Changed[d$Status == "Updated"][1], "→")
   wb <- openxlsx::loadWorkbook(path)
   fills <- vapply(wb$styleObjects, function(s) if (s$sheet == "Data MCSS") s$style$fill$fillFg[[1]] %||% "" else "", "")
-  expect_true(any(grepl("D8EBE3", fills, ignore.case = TRUE)))            # new
-  expect_true(any(grepl("FFF0C2", fills, ignore.case = TRUE)))            # updated
-  expect_true(any(grepl("FFCF5C", fills, ignore.case = TRUE)))            # changed value
+  expect_true(any(grepl("DCF0F3", fills, ignore.case = TRUE)))            # new
+  expect_true(any(grepl("FFF1CC", fills, ignore.case = TRUE)))            # updated
+  expect_true(any(grepl("F5C451", fills, ignore.case = TRUE)))            # changed value
   toc <- openxlsx::read.xlsx(path, "Contents", colNames = FALSE, skipEmptyRows = FALSE)
   expect_true(any(grepl("Monitored data", toc[[1]])))
 })

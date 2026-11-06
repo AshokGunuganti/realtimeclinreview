@@ -40,8 +40,9 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
 
   check_tabs <- check_tab_map(study, displays)
   summary_id <- names(Filter(function(d) d$module == "review_summary", displays))[1]
+  assistant_cfg <- assistant_config(study)
 
-  ui <- app_ui(study, displays, app_cfg, sites, subjects)
+  ui <- app_ui(study, displays, app_cfg, sites, subjects, assistant_cfg)
 
   server <- function(input, output, session) {
     who <- if (!is.null(session$user)) session$user else if (!is.null(user)) user else Sys.getenv("USER", "unknown")
@@ -77,6 +78,7 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
       ctx$check_focus(list(tab = unname(target), check = check, at = Sys.time()))
       bslib::nav_select("tabs", unname(target), session = session)
     }
+    ctx$goto_tab <- function(id) bslib::nav_select("tabs", id, session = session)
     ctx$data <- shiny::reactive(filter_site(cache(asof()), ctx$site()))
     ctx$data_since <- shiny::reactive(filter_site(cache(ctx$since()), ctx$site()))
     ctx$record_hashes <- function(form) record_hash_table(study, form, asof())
@@ -92,6 +94,7 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
     ctx$timeline <- timeline
     panel <- subject_panel_server("panel", ctx, timeline)
     ctx$goto_subject <- panel$open
+    if (isTRUE(assistant_cfg$enabled)) assistant_server("assistant", ctx, assistant_cfg)
 
     # lapply, not for: each module must capture its own display's params (lazy evaluation).
     lapply(displays, function(d) d$def$server(d$id, ctx, d$params))
@@ -151,7 +154,7 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
   shiny::shinyApp(ui, server)
 }
 
-app_ui <- function(study, displays, app_cfg, sites, subjects = character()) {
+app_ui <- function(study, displays, app_cfg, sites, subjects = character(), assistant_cfg = list(enabled = FALSE)) {
   # Sidebar: ungrouped screens head the list; the rest sit in collapsible
   # groups, in the order the groups first appear, all closed at the start so
   # the list reads as a short outline. The open screen's group expands itself.
@@ -165,7 +168,7 @@ app_ui <- function(study, displays, app_cfg, sites, subjects = character()) {
   nav <- lapply(unique(groups), function(g) {
     links <- unname(lapply(displays[groups == g], link))
     if (!nzchar(g)) return(shiny::tagList(links))
-    shiny::tags$details(class = "side-sec", shiny::tags$summary(class = "side-group", g),
+    shiny::tags$details(class = "side-sec", shiny::tags$summary(class = "side-group", style = area_style(g), g),
                         shiny::div(class = "side-sec-links", links))
   })
   sidebar <- bslib::sidebar(
@@ -185,22 +188,27 @@ app_ui <- function(study, displays, app_cfg, sites, subjects = character()) {
       shiny::selectInput("site", "Site", c("All sites", sites), width = "120px"),
       shiny::selectizeInput("find", "Find subject", c("", subjects), width = "140px",
                             options = list(placeholder = "Subject ID")),
-      shiny::downloadButton("workbook", "Review workbook", class = "btn-sm btn-outline-primary", icon = NULL)))
+      shiny::downloadButton("workbook", "Review workbook", class = "btn-sm btn-outline-primary", icon = NULL),
+      if (isTRUE(assistant_cfg$enabled)) assistant_button()))
   panels <- lapply(displays, function(d) {
     checks <- if (length(display_checks(study, d))) form_checks_ui(paste0("chk_", d$id))
     bslib::nav_panel_hidden(value = d$id, checks, d$def$ui(d$id, d$params, study))
   })
   bslib::page_sidebar(
     title = NULL, fillable = FALSE, sidebar = sidebar, window_title = paste(study$id, "data review"),
-    theme = bslib::bs_theme(version = 5, primary = "#0f5e57", fg = "#2b2620", bg = "#faf7f2",
-                            base_font = bslib::font_google("IBM Plex Sans", local = FALSE),
+    theme = bslib::bs_theme(version = 5, primary = "#0b7285", secondary = "#5f6b7a", success = "#2b8a3e",
+                            info = "#2a78d6", warning = "#e8a317", danger = "#c92a2a", fg = "#212529", bg = "#f8fafb",
+                            base_font = bslib::font_google("Inter", wght = c(400, 500, 600, 700), local = FALSE),
+                            heading_font = bslib::font_google("Space Grotesk", wght = c(500, 600, 700), local = FALSE),
                             code_font = bslib::font_google("IBM Plex Mono", local = FALSE),
-                            "border-radius" = "6px", "font-size-base" = "0.9rem"),
+                            "border-radius" = "0.6rem", "font-size-base" = "0.9rem"),
     shiny::tags$head(shiny::tags$style(shiny::HTML(app_css))),
     head,
     shiny::uiOutput("load_banner"),
     do.call(bslib::navset_hidden, c(list(id = "tabs"), unname(panels))),
     subject_panel_ui("panel"),
+    if (isTRUE(assistant_cfg$enabled)) assistant_ui("assistant", study, assistant_cfg),
+    shiny::div(id = "rtcr-busy", `aria-hidden` = "true"),
     shiny::tags$script(shiny::HTML(app_js))
   )
 }

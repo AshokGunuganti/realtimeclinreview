@@ -167,3 +167,54 @@ test_that("the timeline marks the pulls that brought the subject's data, and for
   expect_equal(sp$PULL, c(4L, 6L, 8L))                                   # the two October AEs came in one pull
   expect_true(all(sp$DAY > 1))
 })
+
+test_that("severities take the warm severity scale in any spelling, other levels the series palette", {
+  expect_equal(severity_colour(c("Mild", "MODERATE", "severe", "Grade 4", "life-threatening")),
+               unname(severity_palette[c("MILD", "MODERATE", "SEVERE", "LIFE THREATENING", "LIFE THREATENING")]))
+  expect_equal(severity_colour("unknown"), neutral_accent)
+  sev <- category_colours(c("SEVERE", "MILD", "MODERATE", "MILD"))
+  expect_equal(names(sev), c("MILD", "MODERATE", "SEVERE"))                # in severity order
+  expect_equal(unname(sev), unname(severity_palette[c("MILD", "MODERATE", "SEVERE")]))
+  other <- category_colours(c("b", "a"))
+  expect_equal(unname(other), unname(series_palette[1:2]))
+  expect_equal(series_colour(7), neutral_accent)                           # past the palette folds to neutral
+  expect_equal(area_colour(c("Safety", "Nowhere")), c("#d55181", neutral_accent))
+})
+
+test_that("each lane keeps its own colour, and AEs show severity, a key and SAE tags", {
+  ctx <- test_ctx()
+  lanes <- lapply(profile_params()$lanes, function(lane) {
+    rd <- shiny::isolate(ctx$data())
+    lane_data(lane, rd$tables, "101-002", rd$adsl, ctx$study$schedule, ctx$study$thresholds)
+  })
+  cols <- lane_colours(lanes)
+  types <- vapply(lanes, function(l) l$lane$type, "")
+  expect_equal(cols[types != "events"], unname(series_palette[seq_len(sum(types != "events"))]))
+  html <- as.character(timeline_svg(lanes, 330, 300))
+  expect_match(html, series_palette[["aqua"]], fixed = TRUE)               # mCSS, the second non-event lane
+  expect_match(html, "linearGradient", fixed = TRUE)
+  ae <- shiny::isolate(ctx$data())$tables$AE
+  ae <- ae[ae$SUBJID == "101-002", ]
+  expect_true(any(ae$AESER == "Y"))
+  expect_match(html, ">SAE<", fixed = TRUE)
+  expect_match(html, "Serious (SAE)", fixed = TRUE)
+  expect_match(html, severity_colour(ae$AESEV[1]), fixed = TRUE)
+  # A lane missing for one subject leaves the others' colours alone.
+  without <- lanes
+  without[[which(types == "series")[1]]]$points <- data.frame()
+  expect_match(as.character(timeline_svg(without, 330, 300)), series_palette[["violet"]], fixed = TRUE)
+})
+
+test_that("over-time charts take their form's profile lane colour", {
+  st <- example_study()
+  expect_equal(form_colour(st, "MCSS"), series_palette[["aqua"]])
+  expect_equal(form_colour(st, "IGA"), series_palette[["violet"]])
+  expect_equal(form_colour(st, "AE"), "#0b7285")                        # events lanes have no single colour
+  expect_equal(rgba("#2a78d6", 0.2), "rgba(42,120,214,0.2)")
+  ctx <- test_ctx()
+  shiny::testServer(overtime_server, args = list(ctx = ctx, params = list(form = "IGA", value = "IGASCORE", min_n = 3)), {
+    json <- jsonlite::fromJSON(output$plot)$x$data
+    expect_match(paste(unlist(json), collapse = " "), "#6250d6", fixed = TRUE)
+    expect_match(paste(unlist(json), collapse = " "), "rgba(98,80,214,0.16)", fixed = TRUE)
+  })
+})

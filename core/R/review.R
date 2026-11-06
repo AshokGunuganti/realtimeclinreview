@@ -301,13 +301,15 @@ audit_trail <- function(con, study) {
 }
 
 #' @rdname audit_trail
-#' @param action `"view"` or `"export"`.
-#' @param object What was viewed or exported, e.g. a screen or file name.
+#' @param action `"view"`, `"export"` or `"assistant"` (a question to the
+#'   review app's AI assistant, or a tool it called to answer one).
+#' @param object What was viewed or exported, e.g. a screen or file name, or
+#'   the assistant tool.
 #' @param detail Optional detail, e.g. filters or the data cut.
 #' @export
 log_access <- function(con, study, user, action, object, detail = NA_character_) {
   need_user(user)
-  if (!action %in% c("view", "export")) stop("action must be view or export.", call. = FALSE)
+  if (!action %in% c("view", "export", "assistant")) stop("action must be view, export or assistant.", call. = FALSE)
   db_append(con, "access_log", data.frame(STUDYID = study, ACTION = action, OBJECT = object, DETAIL = detail,
                                                    USERID = user, ACCESSED_AT = utc_now(), stringsAsFactors = FALSE))
   invisible(NULL)

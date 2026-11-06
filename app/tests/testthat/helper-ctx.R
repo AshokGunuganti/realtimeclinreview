@@ -23,7 +23,8 @@ test_ctx <- function(asof = "2026-12-31", since = "2026-10-22", site = "All site
               selected_subject = picked, panel_subject = panel,
               goto_subject = function(id) panel(id), open_profile = function(id) picked(id),
               goto_site = function(id) NULL, timeline = list(list(form = "AE", day = "ASTDY", label = "AETERM")),
-              check_focus = shiny::reactiveVal(NULL))
+              check_focus = shiny::reactiveVal(NULL), tab_opened = shiny::reactiveVal(NULL))
+  ctx$goto_tab <- function(id) ctx$tab_opened(id)
   displays <- lapply(study$config$displays, function(d) d)
   ctx$check_tabs <- check_tab_map(study, displays)
   ctx$tab_titles <- stats::setNames(lapply(displays, function(d) d$title), vapply(displays, function(d) d$id, ""))

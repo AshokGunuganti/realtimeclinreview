@@ -34,8 +34,9 @@ test_that("the sidebar lists every screen under a closed group, in the order the
   st <- example_study()
   displays <- resolve_displays(st$config$displays, review_cache(st)(st$extract_date))
   html <- as.character(app_ui(st, displays, st$config$app, "101"))
-  groups <- regmatches(html, gregexpr('<details class="side-sec">\\s*<summary class="side-group">[^<]+</summary>',
+  groups <- regmatches(html, gregexpr('<details class="side-sec">\\s*<summary class="side-group"[^>]*>[^<]+</summary>',
                                       html))[[1]]
+  expect_match(groups[2], "--area:#d55181")                              # Safety's accent
   expect_equal(gsub("<[^>]+>|\\s{2,}|\n", "", groups), c("Study conduct", "Safety", "Efficacy", "Data quality",
                                                          "Operations", "Close-out"))
   expect_false(grepl("<details[^>]*open", html))                         # all start collapsed

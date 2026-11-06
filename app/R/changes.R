@@ -4,8 +4,8 @@
 # earlier value. The core calls a corrected record "Changed"; reviewers see
 # "Updated".
 
-change_colours <- c(New = "#d8ebe3", Changed = "#fff0c2", Deleted = "#e6dfd3")
-changed_cell_colour <- "#ffcf5c"
+change_colours <- c(New = "#dcf0f3", Changed = "#fff1cc", Deleted = "#dce3e8")
+changed_cell_colour <- "#f5c451"
 
 status_label <- function(x) ifelse(!is.na(x) & x == "Changed", "Updated", x)
 

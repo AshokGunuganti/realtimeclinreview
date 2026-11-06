@@ -8,8 +8,13 @@ License: Apache License (>= 2)
 Config/roxygen2/version: 8.1.1
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
+Depends:
+    R (>= 4.4.0)
 Suggests: 
+    ellmer (>= 0.5.0),
+    promises,
     RSQLite,
+    shinychat (>= 0.5.0),
     testthat (>= 3.0.0),
     withr
 Config/testthat/edition: 3

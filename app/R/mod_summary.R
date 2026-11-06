@@ -87,7 +87,7 @@ summary_server <- function(id, ctx, params) {
       changed <- fc[fc$Total > 0, , drop = FALSE]
       first <- bslib::accordion_panel(
         value = changes_area,
-        title = shiny::div(class = "act-group",
+        title = shiny::div(class = "act-group", style = area_style(changes_area),
           shiny::span(class = "act-count", sum(fc$Total)),
           shiny::span(class = "act-gtitle", changes_area),
           shiny::span(class = paste("note", if (sum(fc$Total)) "late"), changes_summary(fc))),
@@ -97,7 +97,7 @@ summary_server <- function(id, ctx, params) {
         x <- g[[area]]
         bslib::accordion_panel(
           value = area,
-          title = shiny::div(class = "act-group",
+          title = shiny::div(class = "act-group", style = area_style(area),
             shiny::span(class = "act-count", sum(x$Findings)),
             shiny::span(class = "act-gtitle", area),
             shiny::span(class = paste("note", if (sum(x$New)) "late"), group_summary(x))),

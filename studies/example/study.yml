@@ -62,6 +62,17 @@ labels:
 data_pulls:
   dates: [2026-01-14, 2026-02-25, 2026-04-08, 2026-05-20, 2026-07-01, 2026-08-12, 2026-09-23, 2026-11-04, 2026-12-09]
 
+# AI assistant ("Ask the data"): Claude answers questions on the review data
+# through read-only tools. Needs ANTHROPIC_API_KEY on the server. Verbatim free
+# text (*TERM, *TXT, *TEXT, *COMM fields and those below) is withheld from the
+# model unless listed under share_free_text. Questions and tool calls go to the
+# access log.
+assistant:
+  enabled: true
+  row_cap: 50
+  free_text: [SV.VISNDRS]     # reason a visit was not done
+  share_free_text: []
+
 # Standard derivations, run in order on the as-of snapshot.
 derivations:
   - id: REF
@@ -173,6 +184,7 @@ displays:
           level: AESEV
           title: Adverse events
           ongoing: {field: AEOUT, values: [NOT RECOVERED/NOT RESOLVED, RECOVERING/RESOLVING]}
+          serious: {field: AESER, value: "Y"}
         - {type: series, form: MCSS, date: PHOTODT, value: MCSS, title: mCSS total, note: central read, ref: BASE, ref_label: baseline}
         - {type: series, form: IGA, date: IGADAT, value: IGASCORE, title: IGA change, note: higher is better, ref: 0, ref_label: no change}
         - {type: intervals, form: DIARY, start: DRYSTDAT, end: DRYENDAT, value: COMPPCT, unit: "%", title: Dosing compliance, note: "diary, % of doses", ref: compliance, ref_label: target}
