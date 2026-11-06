@@ -67,6 +67,8 @@ register_library_displays <- function() {
   register_display("sign_off", signoff_ui, signoff_server)
   register_display("audit_trail", audit_ui, audit_server)
   register_display("data_load", dataload_ui, dataload_server)
+  register_display("action_log", actions_ui, actions_server)
+  register_display("study_team", team_ui, team_server)
   register_display("monitored_changes", monitored_ui, monitored_server)
 }
 

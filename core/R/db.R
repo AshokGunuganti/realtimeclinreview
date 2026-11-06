@@ -84,6 +84,14 @@ db_append <- function(con, table, df) {
   DBI::dbAppendTable(con, table, df)
 }
 
+# Serialises writers for one key inside a transaction, so IDs counted from
+# existing rows are not handed out twice. Postgres takes an advisory lock;
+# SQLite already lets only one writer in at a time.
+db_lock <- function(con, key) {
+  if (is_postgres(con)) db_get(con, "SELECT pg_advisory_xact_lock(hashtext(?))", params = list(key))
+  invisible()
+}
+
 # Inserts one row and returns the value of its `id` column, from the same
 # statement, so concurrent writers never see each other's IDs.
 db_insert_id <- function(con, table, row, id) {

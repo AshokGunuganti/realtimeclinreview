@@ -98,7 +98,18 @@ app:
   queries: QUERY              # query report: query status on listings, sites, queries and lock readiness
   priority: [AE, PK, MCSS]    # in the review queue, subjects with changes to these forms come first
   monitored: [AE, PK, MCSS, IGA, DIARY, SV, EX, DS, DM]   # listed with new and updated records coloured
+# Study team: the people actions can be assigned to. Added to the review store
+# on first start; after that the team is kept in the app (Study team screen).
+# Members without a login own actions but cannot sign in. Simulated roles only.
+team:
+  - {id: dm, name: Data manager, role: Data manager}
+  - {id: mm, name: Medical monitor, role: Medical monitor}
+  - {id: lead-cra, name: Lead CRA, role: CRA}
+  - {id: cra113, name: Site 113 CRA, role: CRA}
+  - {id: safety, name: Safety physician, role: Safety}
+  - {id: sm, name: Study manager, role: Study manager}
 displays:
+  - {id: actions, module: action_log, title: Action items}
   - {id: review, module: review_queue, title: My review}
   - {id: changes, module: monitored_changes, title: New and updated data}
 
@@ -162,6 +173,7 @@ displays:
   # Operations
   - {id: sites, module: site_scorecard, title: Sites, group: Operations, params: {visits: *visits, query_age: 30, form_status: FSTAT}}
   - {id: lock, module: lock_readiness, title: Lock readiness, group: Operations, params: {form_status: FSTAT}}
+  - {id: team, module: study_team, title: Study team, group: Operations}
 
   # Close-out
   - {id: signoff, module: sign_off, title: Sign-off, group: Close-out}

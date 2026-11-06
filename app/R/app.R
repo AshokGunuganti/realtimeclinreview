@@ -28,6 +28,7 @@
 rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
   study <- rtcrcore::load_study(study_dir, extract)
   con <- rtcrcore::open_review_store(if (is.null(store)) study$config$review_store else store, base_dir = study_dir)
+  if (length(study$config$team)) rtcrcore::seed_team(con, study$id, study$config$team, "study.yml")
   cache <- review_cache(study)
   displays <- resolve_displays(study$config$displays, cache(study$extract_date))
   app_cfg <- if (is.null(study$config$app)) list() else study$config$app

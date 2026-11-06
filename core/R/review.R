@@ -55,6 +55,7 @@ init_review_store <- function(con) {
     append_only_ddl(review_tables, is_postgres(con))
   )
   for (s in ddl) db_exec(con, s)
+  init_action_store(con)
   info <- db_get(con, "SELECT VALUE FROM store_info WHERE KEY = 'schema_version'")
   if (!nrow(info)) {
     db_append(con, "store_info", data.frame(KEY = "schema_version", VALUE = as.character(review_store_schema_version),
