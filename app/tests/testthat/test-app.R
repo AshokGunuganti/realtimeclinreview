@@ -432,3 +432,14 @@ test_that("sheet names are legal, unique and do not clash with fixed sheets", {
   expect_equal(n, c("A_1__b____c", "Contents_", "X", "X_1", strrep("y", 27)))
   expect_true(all(nchar(n) <= 31))
 })
+
+test_that("headline numbers are coloured tiles, problem counts red while there are any", {
+  expect_match(as.character(kpi("Subjects", 51)), 'class="kpi kpi-auto"')
+  expect_match(as.character(kpi("Missed", 2, tone = "bad")), "kpi-bad")
+  expect_error(kpi("x", 1, tone = "rainbow"), "Unknown kpi tone")
+  expect_equal(alert_tone(3), "bad")
+  expect_equal(alert_tone(0), "good")
+  expect_equal(alert_tone(c(NA, 1), "warn"), "warn")
+  expect_true(all(visit_tone %in% kpi_tones))
+  expect_setequal(names(visit_tone), names(status_colours))
+})

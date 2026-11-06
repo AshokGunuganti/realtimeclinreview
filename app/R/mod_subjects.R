@@ -18,9 +18,9 @@ subjects_server <- function(id, ctx, params) {
       st <- toupper(a$EOSSTT)
       do.call(bslib::layout_columns, c(list(fill = FALSE, col_widths = bslib::breakpoints(sm = 6, lg = 3)), list(
         kpi("Subjects", nrow(a), sprintf("%d ongoing", sum(st == "ONGOING", na.rm = TRUE))),
-        kpi("Completed", sum(st == "COMPLETED", na.rm = TRUE)),
-        kpi("Discontinued", sum(st == "DISCONTINUED", na.rm = TRUE)),
-        kpi("To review", sum(q$STATUS == "To review"), sprintf("changes since %s", fmt_date(ctx$since()))))))
+        kpi("Completed", sum(st == "COMPLETED", na.rm = TRUE), tone = "good"),
+        kpi("Discontinued", sum(st == "DISCONTINUED", na.rm = TRUE), tone = "neutral"),
+        kpi("To review", sum(q$STATUS == "To review"), sprintf("changes since %s", fmt_date(ctx$since())), tone = "violet"))))
     })
     tbl <- shiny::reactive({
       rd <- ctx$data()

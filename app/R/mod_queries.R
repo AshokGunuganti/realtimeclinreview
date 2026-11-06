@@ -24,8 +24,10 @@ queries_server <- function(id, ctx, params) {
       x <- q()
       un <- x$STATUS != "Closed"
       do.call(bslib::layout_columns, c(list(fill = FALSE, col_widths = bslib::breakpoints(sm = 6, lg = 3)), list(
-        kpi("Unresolved", sum(un), sprintf("%d open, %d answered", sum(x$STATUS == "Open"), sum(x$STATUS == "Answered"))),
-        kpi(sprintf("Older than %d days", old), sum(un & x$AGE > old, na.rm = TRUE), "unresolved"),
+        kpi("Unresolved", sum(un), sprintf("%d open, %d answered", sum(x$STATUS == "Open"), sum(x$STATUS == "Answered")),
+            tone = alert_tone(sum(un), "warn")),
+        kpi(sprintf("Older than %d days", old), sum(un & x$AGE > old, na.rm = TRUE), "unresolved",
+            tone = alert_tone(sum(un & x$AGE > old, na.rm = TRUE))),
         kpi("Closed", sum(x$STATUS == "Closed"),
             if (any(!is.na(x$DAYSTOCLOSE))) sprintf("median %g days to close", stats::median(x$DAYSTOCLOSE, na.rm = TRUE))),
         kpi("Raised", nrow(x), "on or before the review date"))))

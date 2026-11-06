@@ -72,16 +72,19 @@ sites_server <- function(id, ctx, params) {
       lag_kpi <- kpi("Median entry lag", if (length(l)) sprintf("%g days", stats::median(l)) else "\u2013",
                      if (length(l)) sprintf("%.0f%% within %g days", 100 * mean(l <= target), target))
       qry_kpi <- kpi("Unresolved queries", if (is.null(open)) "\u2013" else nrow(open),
-                     if (!is.null(open) && nrow(open)) sprintf("oldest %g days", max(open$AGE)))
+                     if (!is.null(open) && nrow(open)) sprintf("oldest %g days", max(open$AGE)),
+                     tone = alert_tone(if (is.null(open)) 0 else nrow(open), "warn"))
       fnd_kpi <- kpi("Open findings", if (is.null(s$FINDINGS)) "\u2013" else sum(s$FINDINGS), "from data checks")
       tiles <- if (one()) {
         vs <- visits()
         fs <- fstat()
-        list(kpi("Overdue visits", sum(vs$STATUS == "Overdue / not entered"), sprintf("%d missed", sum(vs$STATUS == "Missed"))),
+        list(kpi("Overdue visits", sum(vs$STATUS == "Overdue / not entered"), sprintf("%d missed", sum(vs$STATUS == "Missed")),
+                  tone = alert_tone(sum(vs$STATUS %in% c("Overdue / not entered", "Missed")))),
              if (is.null(fs)) fnd_kpi else kpi("Forms awaiting SDV", sum(fs$STATUS == "Entered"), sprintf("of %d", nrow(fs))),
              qry_kpi, lag_kpi)
       } else {
-        list(kpi("Sites", nrow(s), sprintf("%d need attention", sum(s$STATUS == "Needs attention"))), lag_kpi, qry_kpi,
+        list(kpi("Sites", nrow(s), sprintf("%d need attention", sum(s$STATUS == "Needs attention")),
+                  tone = "teal"), lag_kpi, qry_kpi,
              fnd_kpi)
       }
       do.call(bslib::layout_columns, c(list(fill = FALSE, col_widths = bslib::breakpoints(sm = 6, lg = 3)), tiles))

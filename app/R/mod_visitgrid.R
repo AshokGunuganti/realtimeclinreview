@@ -36,7 +36,7 @@ visitgrid_server <- function(id, ctx, params) {
     output$kpis <- shiny::renderUI({
       v <- status()
       do.call(bslib::layout_columns, c(list(fill = FALSE, col_widths = bslib::breakpoints(sm = 6, lg = 2)),
-        lapply(names(status_colours), function(s) kpi(s, sum(v$STATUS == s)))))
+        lapply(names(status_colours), function(s) kpi(s, sum(v$STATUS == s), tone = visit_tone[[s]]))))
     })
     output$grid <- DT::renderDT({
       g <- grid()

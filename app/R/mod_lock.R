@@ -30,10 +30,12 @@ lock_server <- function(id, ctx, params) {
       x <- lr()
       n <- function(st) sum(s$STATUS == st)
       do.call(bslib::layout_columns, c(list(fill = FALSE, col_widths = bslib::breakpoints(sm = 6, lg = 3)), list(
-        kpi("Subjects locked", n("Locked"), sprintf("of %d", nrow(s))),
-        kpi("Ready to lock", n("Ready to lock"), "subjects"),
-        kpi("Not ready", n("Not ready"), sprintf("%d of %d forms", sum(x$STATUS == "Not ready"), nrow(x))),
-        kpi("Unresolved queries", sum(x$OPENQ), sprintf("%d open findings", sum(x$FINDINGS))))))
+        kpi("Subjects locked", n("Locked"), sprintf("of %d", nrow(s)), tone = "teal"),
+        kpi("Ready to lock", n("Ready to lock"), "subjects", tone = "good"),
+        kpi("Not ready", n("Not ready"), sprintf("%d of %d forms", sum(x$STATUS == "Not ready"), nrow(x)),
+            tone = alert_tone(n("Not ready"), "warn")),
+        kpi("Unresolved queries", sum(x$OPENQ), sprintf("%d open findings", sum(x$FINDINGS)),
+            tone = alert_tone(sum(x$OPENQ))))))
     })
     stbl <- shiny::reactive({
       s <- subjects()

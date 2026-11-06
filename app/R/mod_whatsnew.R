@@ -48,9 +48,10 @@ whatsnew_server <- function(id, ctx, params) {
         kpi("New records", sum(d$RECSTAT == "New"), sprintf("since %s", format(ctx$since()))),
         kpi("Changed records", sum(d$RECSTAT == "Changed"), "corrections to earlier data"),
         kpi("Deleted records", sum(d$RECSTAT == "Deleted")),
-        kpi("New findings", sum(f$FINDSTAT == "New"), sprintf("%d error", sum(f$FINDSTAT == "New" & f$SEVERITY == "error"))),
+        kpi("New findings", sum(f$FINDSTAT == "New"), sprintf("%d error", sum(f$FINDSTAT == "New" & f$SEVERITY == "error")),
+            tone = alert_tone(sum(f$FINDSTAT == "New"), "warn")),
         kpi("Changed findings", sum(f$FINDSTAT == "Changed")),
-        kpi("Resolved findings", sum(f$FINDSTAT == "Resolved")))
+        kpi("Resolved findings", sum(f$FINDSTAT == "Resolved"), tone = "good"))
     })
     table_card_server("rec", rec_tbl, ctx, "Record changes", mark_type = "record")
     table_card_server("fnd", fnd_tbl, ctx, "Finding changes", mark_type = "finding")

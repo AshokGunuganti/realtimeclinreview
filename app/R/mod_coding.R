@@ -28,8 +28,10 @@ coding_server <- function(id, ctx, params) {
       latest <- if (length(vers)) as.character(max(numeric_version(vers))) else character()
       do.call(bslib::layout_columns, c(list(fill = FALSE, col_widths = bslib::breakpoints(sm = 6, lg = 3)), list(
         kpi("Records", nrow(r), sprintf("%d verbatim terms", nrow(t))),
-        kpi("Not coded", sum(r$FLAG == "Not coded"), "awaiting coding on the review date"),
-        kpi("Inconsistent terms", sum(!t$CONSISTENT), sprintf("%d records", sum(r$FLAG == "Inconsistent"))),
+        kpi("Not coded", sum(r$FLAG == "Not coded"), "awaiting coding on the review date",
+            tone = alert_tone(sum(r$FLAG == "Not coded"), "warn")),
+        kpi("Inconsistent terms", sum(!t$CONSISTENT), sprintf("%d records", sum(r$FLAG == "Inconsistent")),
+            tone = alert_tone(sum(!t$CONSISTENT))),
         kpi("Older version", sum(r$FLAG == "Older version"),
             if (length(latest)) paste("latest in use", latest) else NULL))))
     })

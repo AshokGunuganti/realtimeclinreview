@@ -26,10 +26,28 @@ app_css <- "
   h1,h2,h3,h4,.page-title,.section-h,.side-brand{font-family:'Space Grotesk',Inter,system-ui,sans-serif}
   .note{font-size:.8rem;color:#5f6b7a}
   .mono,.sid,.sid-big,.inbox-id{font-family:'IBM Plex Mono',ui-monospace,monospace}
-  .kpi{padding:.1rem 0;height:100%}
-  .kpi .lab{font-size:.78rem;color:#5f6b7a}
-  .kpi .val{font-size:1.75rem;font-weight:600;line-height:1.2}
-  .kpi .sub{font-size:.78rem;color:#5f6b7a}
+  .kpi{--k1:#0b7285;--k2:#1098ad;position:relative;overflow:hidden;height:100%;padding:.95rem 1.1rem 1rem;
+    border-radius:.9rem;color:#fff;background:linear-gradient(135deg,var(--k1) 0%,var(--k2) 100%);
+    box-shadow:0 1px 2px rgba(33,37,41,.06),0 8px 22px color-mix(in srgb,var(--k1) 22%,transparent);
+    transition:transform .2s ease,box-shadow .2s ease}
+  .kpi:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(33,37,41,.08),0 14px 30px color-mix(in srgb,var(--k1) 30%,transparent)}
+  .kpi::after{content:'';position:absolute;right:-34px;top:-38px;width:120px;height:120px;border-radius:50%;
+    background:rgba(255,255,255,.11);pointer-events:none}
+  .kpi::before{content:'';position:absolute;right:18px;bottom:-46px;width:90px;height:90px;border-radius:50%;
+    background:rgba(255,255,255,.07);pointer-events:none}
+  .kpi .lab{position:relative;font-size:.78rem;font-weight:500;letter-spacing:.01em;color:rgba(255,255,255,.9)}
+  .kpi .val{position:relative;font-family:'Space Grotesk',Inter,sans-serif;font-size:2rem;font-weight:600;line-height:1.15;
+    margin-top:.15rem;font-variant-numeric:tabular-nums}
+  .kpi .sub{position:relative;font-size:.78rem;color:rgba(255,255,255,.82)}
+  .kpi-teal{--k1:#0b7285;--k2:#1592a8}.kpi-blue{--k1:#1c5cab;--k2:#2f7ad0}.kpi-violet{--k1:#5340c4;--k2:#6f5fdc}
+  .kpi-aqua{--k1:#0d7f5f;--k2:#16a078}.kpi-magenta{--k1:#b0346d;--k2:#cc4f88}.kpi-green,.kpi-good{--k1:#2b7a38;--k2:#3b9a4a}
+  .kpi-warn{--k1:#a65400;--k2:#cf7414}.kpi-bad{--k1:#b02525;--k2:#d64242}.kpi-neutral{--k1:#55606d;--k2:#717d8b}
+  .bslib-grid>:nth-child(6n+2)>.kpi-auto{--k1:#1c5cab;--k2:#2f7ad0}
+  .bslib-grid>:nth-child(6n+3)>.kpi-auto{--k1:#5340c4;--k2:#6f5fdc}
+  .bslib-grid>:nth-child(6n+4)>.kpi-auto{--k1:#0d7f5f;--k2:#16a078}
+  .bslib-grid>:nth-child(6n+5)>.kpi-auto{--k1:#b0346d;--k2:#cc4f88}
+  .bslib-grid>:nth-child(6n)>.kpi-auto{--k1:#2b7a38;--k2:#3b9a4a}
+  @media (prefers-reduced-motion:reduce){.kpi,.kpi:hover{transition:none;transform:none}}
   .badge-s{display:inline-block;padding:.05rem .45rem;border-radius:4px;font-size:.72rem;font-weight:500;white-space:nowrap}
   .b-crit{background:#fbe5e5;color:#c92a2a}.b-warn{background:#fdf0d2;color:#7a5200}.b-ser{background:#fde9e1;color:#a13a12}
   .b-new{background:#e3f1f4;color:#085a69}.b-upd{background:#ffebb8;color:#7a5200}.b-chg{background:#e4e9ed;color:#343a40}.b-ok{background:#e3f3e6;color:#2b8a3e}
@@ -289,10 +307,23 @@ site_link <- function(id) {
     htmltools::htmlEscape(id), htmltools::htmlEscape(id)))
 }
 
-kpi <- function(label, value, sub = NULL) {
-  shiny::div(class = "kpi", shiny::div(class = "lab", label), shiny::div(class = "val", value),
+# A headline number as a coloured tile (after Tahoe Explorer's value boxes).
+# `tone` is one of kpi_tones; without one, tiles in a row take the palette in
+# turn. Counts of problems use alert_tone(): red while there are any, else green.
+kpi_tones <- c("teal", "blue", "violet", "aqua", "magenta", "green", "good", "warn", "bad", "neutral")
+
+kpi <- function(label, value, sub = NULL, tone = NULL) {
+  if (!is.null(tone) && !tone %in% kpi_tones) stop("Unknown kpi tone '", tone, "'.", call. = FALSE)
+  shiny::div(class = paste("kpi", if (is.null(tone)) "kpi-auto" else paste0("kpi-", tone)),
+             shiny::div(class = "lab", label), shiny::div(class = "val", value),
              if (!is.null(sub)) shiny::div(class = "sub", sub))
 }
+
+# Visit status tiles keep the meaning of the visit grid colours.
+visit_tone <- c("Complete" = "good", "Out of window" = "warn", "Overdue / not entered" = "warn", "Missed" = "bad",
+                "Not yet due" = "neutral", "Discontinued" = "neutral")
+
+alert_tone <- function(n, when = "bad") if (isTRUE(sum(n, na.rm = TRUE) > 0)) when else "good"
 
 fmt_cell <- function(v) {
   if (inherits(v, "POSIXct")) return(format(v, "%Y-%m-%d %H:%M", tz = "UTC"))
