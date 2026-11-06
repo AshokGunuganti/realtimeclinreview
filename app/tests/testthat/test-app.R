@@ -175,6 +175,8 @@ test_that("the checks catalogue lists active checks with their change record and
     expect_match(html, "Open Dosing diary")
     expect_match(html, "Findings on the review summary")
     expect_false(grepl("accordion-collapse collapse show", html))
+    head <- output$headline$html
+    for (s in c("Active checks", "New findings", "Retired checks", "kpi-neutral")) expect_match(head, s, fixed = TRUE)
     session$setInputs(open = "CL-PK-001")
     expect_equal(ctx$check_focus()$tab, "pk")
   })
@@ -189,7 +191,8 @@ test_that("new and updated data is the first check, across every clinical form",
     expect_gt(sum(fc$Total), 0)
     html <- output$groups$html
     expect_lt(regexpr("New and updated data", html), regexpr("Safety", html))   # first area
-    expect_match(output$headline$html, "new or updated records")
+    expect_match(output$headline$html, "New or updated records")
+    expect_match(output$headline$html, "kpi-teal")
 
     f <- fc$Form[fc$Total > 0][1]
     session$setInputs(pick_form = f)

@@ -47,6 +47,7 @@ app_css <- "
   .bslib-grid>:nth-child(6n+4)>.kpi-auto{--k1:#0d7f5f;--k2:#16a078}
   .bslib-grid>:nth-child(6n+5)>.kpi-auto{--k1:#b0346d;--k2:#cc4f88}
   .bslib-grid>:nth-child(6n)>.kpi-auto{--k1:#2b7a38;--k2:#3b9a4a}
+  .kpi-row{margin-bottom:1.1rem}
   @media (prefers-reduced-motion:reduce){.kpi,.kpi:hover{transition:none;transform:none}}
   .badge-s{display:inline-block;padding:.05rem .45rem;border-radius:4px;font-size:.72rem;font-weight:500;white-space:nowrap}
   .b-crit{background:#fbe5e5;color:#c92a2a}.b-warn{background:#fdf0d2;color:#7a5200}.b-ser{background:#fde9e1;color:#a13a12}
@@ -322,6 +323,11 @@ kpi <- function(label, value, sub = NULL, tone = NULL) {
 # Visit status tiles keep the meaning of the visit grid colours.
 visit_tone <- c("Complete" = "good", "Out of window" = "warn", "Overdue / not entered" = "warn", "Missed" = "bad",
                 "Not yet due" = "neutral", "Discontinued" = "neutral")
+
+# A row of tiles: two across on small screens, four on wide ones.
+kpi_row <- function(...) {
+  bslib::layout_columns(fill = FALSE, col_widths = bslib::breakpoints(sm = 6, lg = 3), class = "kpi-row", ...)
+}
 
 alert_tone <- function(n, when = "bad") if (isTRUE(sum(n, na.rm = TRUE) > 0)) when else "good"
 

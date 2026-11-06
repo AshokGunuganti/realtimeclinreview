@@ -18,8 +18,8 @@ summary_ui <- function(id, params, study) {
   view_is <- function(v) sprintf("output['%s'] == '%s'", ns("view"), v)
   shiny::tagList(
     shiny::div(class = "act-head",
-      shiny::div(shiny::div(class = "note", "New and updated data across every clinical form, then the review checks by area. A check opens its tab."),
-                 shiny::uiOutput(ns("headline")))),
+      shiny::div(class = "note", "New and updated data across every clinical form, then the review checks by area. A check opens its tab.")),
+    shiny::uiOutput(ns("headline")),
     shiny::uiOutput(ns("groups")),
     shiny::div(class = "chk-showing", shiny::uiOutput(ns("showing"))),
     shiny::conditionalPanel(view_is("findings"),
@@ -75,10 +75,13 @@ summary_server <- function(id, ctx, params) {
     output$headline <- shiny::renderUI({
       s <- summary()
       not_run <- sum(nzchar(s$Note))
-      shiny::p(class = "act-sum", sprintf("%d new or updated records \u00b7 ", sum(form_counts()$Total)),
-               sprintf("%d checks \u00b7 %d findings \u00b7 ", nrow(s), sum(s$Findings)),
-               shiny::span(class = if (sum(s$New)) "late", sprintf("%d new", sum(s$New))),
-               if (not_run) shiny::span(class = "late", sprintf(" \u00b7 %d not running", not_run)))
+      fc <- form_counts()
+      kpi_row(
+        kpi("New or updated records", sum(fc$Total), sprintf("on %d clinical forms", sum(fc$Total > 0)), tone = "teal"),
+        kpi("Findings", sum(s$Findings), sprintf("from %d checks", nrow(s)), tone = "blue"),
+        kpi("New findings", sum(s$New), sprintf("since %s", fmt_date(ctx$since())), tone = alert_tone(sum(s$New), "warn")),
+        kpi("Checks not running", not_run, if (not_run) "see their areas below" else "every check ran",
+            tone = alert_tone(not_run)))
     })
 
     output$groups <- shiny::renderUI({

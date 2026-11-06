@@ -12,8 +12,8 @@ catalogue_ui <- function(id, params, study) {
   shiny::tagList(
     shiny::div(class = "act-head",
       shiny::div(shiny::div(class = "note", paste("The review checks in the check spec. The review team updates them during",
-                                                  "the study; each change is kept. A check opens the tab for its form.")),
-                 shiny::uiOutput(ns("headline")))),
+                                                  "the study; each change is kept. A check opens the tab for its form.")))),
+    shiny::uiOutput(ns("headline")),
     shiny::uiOutput(ns("groups"))
   )
 }
@@ -26,10 +26,14 @@ catalogue_server <- function(id, ctx, params) {
     output$headline <- shiny::renderUI({
       cat <- catalogue()
       active <- cat[cat$Status == "active", , drop = FALSE]
-      shiny::p(class = "act-sum", sprintf("%d active checks \u00b7 %d findings \u00b7 ", nrow(active), sum(active$Findings)),
-               shiny::span(class = if (sum(active$New)) "late", sprintf("%d new", sum(active$New))),
-               if (any(cat$Status == "retired")) sprintf(" \u00b7 %d retired", sum(cat$Status == "retired")),
-               sprintf(" \u00b7 last change %s", fmt_date(max(as.Date(cat$Changed_on), na.rm = TRUE))))
+      changed <- stats::na.omit(as.Date(cat$Changed_on))
+      kpi_row(
+        kpi("Active checks", nrow(active), if (length(changed)) sprintf("last change %s", fmt_date(max(changed))),
+            tone = "teal"),
+        kpi("Findings", sum(active$Findings), "from the active checks", tone = "blue"),
+        kpi("New findings", sum(active$New), sprintf("since %s", fmt_date(ctx$since())),
+            tone = alert_tone(sum(active$New), "warn")),
+        kpi("Retired checks", sum(cat$Status == "retired"), "no longer run; kept for the record", tone = "neutral"))
     })
     output$groups <- shiny::renderUI({
       cat <- catalogue()
