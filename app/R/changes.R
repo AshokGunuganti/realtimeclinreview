@@ -4,7 +4,7 @@
 # earlier value. The core calls a corrected record "Changed"; reviewers see
 # "Updated".
 
-change_colours <- c(New = "#d9e8fc", Changed = "#fff0c2", Deleted = "#e6e8ec")
+change_colours <- c(New = "#d8ebe3", Changed = "#fff0c2", Deleted = "#e6dfd3")
 changed_cell_colour <- "#ffcf5c"
 
 status_label <- function(x) ifelse(!is.na(x) & x == "Changed", "Updated", x)
@@ -55,12 +55,14 @@ mark_changed_cells <- function(cells, recid, fields) {
   cells
 }
 
-# "AESEV: MILD -> MODERATE; AEOUT: ..." per record, for exports.
-changed_text <- function(recid, fields) {
+# "Severity: MILD -> MODERATE; Outcome: ..." per record, for exports. Variables
+# are named by their label when `labels` has one.
+changed_text <- function(recid, fields, labels = character()) {
   vapply(recid, function(r) {
     f <- fields[fields$RECID == r, , drop = FALSE]
     if (!nrow(f)) return("")
-    paste(sprintf("%s: %s \u2192 %s", f$VARIABLE, ifelse(is.na(f$OLD), "blank", f$OLD),
+    lab <- labels[f$VARIABLE]
+    paste(sprintf("%s: %s \u2192 %s", ifelse(is.na(lab), f$VARIABLE, lab), ifelse(is.na(f$OLD), "blank", f$OLD),
                   ifelse(is.na(f$NEW), "blank", f$NEW)), collapse = "; ")
   }, "", USE.NAMES = FALSE)
 }

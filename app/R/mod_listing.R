@@ -3,7 +3,8 @@
 # deleted), changed values marked with their earlier value, unresolved EDC
 # queries and review marks. Params: form, columns, show ("all" or "changes":
 # the records shown at first), tools (FALSE hides the legend and the switch,
-# for pages that show them once for several listings).
+# for pages that show them once for several listings), flagged_by (TRUE adds
+# the review checks that also flag each record).
 
 listing_ui <- function(id, params, study) {
   ns <- shiny::NS(id)
@@ -40,7 +41,7 @@ listing_server <- function(id, ctx, params) {
         v[is.na(v)] <- ""
         v
       }), stringsAsFactors = FALSE, check.names = FALSE)
-      cells <- mark_changed_cells(cells, t$RECID, fc$fields)
+      cells <- label_columns(mark_changed_cells(cells, t$RECID, fc$fields), ctx$study)
       h <- ctx$record_hashes(form)
       key <- paste0(form, ":", t$RECID)
       x <- data.frame(Subject = sid_link(t$SUBJID), Site = t$SITEID,
@@ -53,12 +54,28 @@ listing_server <- function(id, ctx, params) {
         n <- table(open$TARGET)[key]
         x$Queries <- ifelse(is.na(n), "", badge(sprintf("%d open", as.integer(n))))
       }
+      if (isTRUE(params$flagged_by)) x$`Also flagged by` <- flagged_by(ctx$data(), key)
       x$Version <- t$VERSION
       x$.RECSTAT <- status
       dep <- h$DEPHASH[match(key, h$TARGET_KEY)]
       with_marks(cbind(x, mark_cols(key, dep, t$SUBJID, t$VERSION)), ctx, "record")
     })
     table_card_server("tbl", tbl, ctx, form, mark_type = "record", page_length = 15)
-    list(n_changes = shiny::reactive(sum(changes()$status != "Unchanged")))
+    list(n_changes = shiny::reactive(sum(changes()$status != "Unchanged")),
+         status_counts = shiny::reactive(table(factor(changes()$status, c("New", "Changed", "Deleted")))),
+         changed_keys = shiny::reactive({
+           fc <- changes()
+           stats::setNames(fc$status, paste0(form, ":", fc$rows$RECID))[fc$status != "Unchanged"]
+         }))
   })
+}
+
+# The review checks (not programmer checks) whose findings sit on each record
+# key, as "AE-SEV, AE-SAE"; blank when none do.
+flagged_by <- function(data, keys) {
+  programmer <- data$summary$ID[data$summary$TIER == "structural"]
+  f <- data$findings
+  f <- f[!f$CHECKID %in% programmer & !is.na(f$FORMOID), , drop = FALSE]
+  by_key <- split(f$CHECKID, paste0(f$FORMOID, ":", f$RECID))
+  vapply(keys, function(k) paste(unique(by_key[[k]]), collapse = ", "), "", USE.NAMES = FALSE)
 }

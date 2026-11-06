@@ -33,7 +33,8 @@ corrections, ordered by \code{AVAILDT}), \code{DESCRIPTION}.
 is comma-separated; \code{ARGS} is \verb{name=value; name=value}; \code{REQUIRED} is
 \code{Y} when the source fields must exist in the extract. Rows with
 transform \code{filter} or \code{pivot} reshape the source before any field is
-mapped and leave \code{VARIABLE} blank.
+mapped and leave \code{VARIABLE} blank. An optional \code{LABEL} column gives the
+column heading reviewers see in place of the variable name.
 \item \strong{Codelists}: \code{CODELIST}, \code{CODE}, \code{DECODE}.
 }
 }

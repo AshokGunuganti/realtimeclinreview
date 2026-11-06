@@ -22,7 +22,10 @@ it, \code{checks} in study.yml lists every check.}
 A list: \code{id}, \code{dir}, \code{config}, \code{mapping}, \code{schedule},
 \code{extract_date}, \code{cut_id} (\code{NA} when read from a folder), \code{tables},
 \code{issues}, \code{checks}, \code{check_spec} (from
-\code{\link[=read_check_spec]{read_check_spec()}}, or \code{NULL}), \code{derivations}, \code{thresholds}.
+\code{\link[=read_check_spec]{read_check_spec()}}, or \code{NULL}), \code{derivations}, \code{thresholds}, \code{labels}
+(column headings, from \code{\link[=column_labels]{column_labels()}}), \code{extract} (the extract or cut
+label) and \code{sources} (the source tables as read, by file name, before
+mapping: the original values reviewers can compare against).
 }
 \description{
 Reads study.yml, compiles the mapping spec, reads one extract and maps it,

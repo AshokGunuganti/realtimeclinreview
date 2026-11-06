@@ -70,3 +70,33 @@ test_that("heavy use of derive raises a warning", {
   f$Mapping$ARGS[f$Mapping$VARIABLE %in% c("SEXDCD", "PCLABEL", "PCSTRESN")] <- "fn=anything"
   expect_warning(compile_spec(write_spec(f), derive_share = 0.1), "use derive")
 })
+
+test_that("an optional LABEL column gives each variable a reviewer-facing label", {
+  f <- spec_frames()
+  f$Mapping$LABEL <- NA_character_
+  f$Mapping$LABEL[f$Mapping$VARIABLE %in% "SEXDCD"] <- "Sex"
+  yml <- tempfile(fileext = ".yml")
+  m <- compile_spec(write_spec(f), yml)
+  sex <- Filter(function(e) identical(e$variable, "SEXDCD"), m$forms$DM$fields)[[1]]
+  expect_equal(sex$label, "Sex")
+  expect_true(is.na(m$forms$DM$fields[[1]]$label))
+  expect_equal(Filter(function(e) identical(e$variable, "SEXDCD"), read_mapping(yml)$forms$DM$fields)[[1]]$label, "Sex")
+
+  # Specs without the column still compile; their fields have no label.
+  expect_true(is.na(compile_spec(write_spec())$forms$DM$fields[[1]]$label))
+})
+
+test_that("column labels come from study.yml, then the spec, then the standard header", {
+  f <- spec_frames()
+  f$Mapping$LABEL <- NA_character_
+  f$Mapping$LABEL[f$Mapping$VARIABLE %in% "SEXDCD"] <- "Sex"
+  f$Mapping$LABEL[f$Mapping$VARIABLE %in% "PCSTRESN"] <- "Concentration"
+  m <- compile_spec(write_spec(f))
+  lab <- column_labels(m, list(PCSTRESN = "Concentration (ng/mL)", CHG = "Change from baseline"))
+  expect_equal(lab[["SEXDCD"]], "Sex")
+  expect_equal(lab[["PCSTRESN"]], "Concentration (ng/mL)")
+  expect_equal(lab[["CHG"]], "Change from baseline")
+  expect_equal(lab[["SUBJID"]], "Subject")
+  expect_false("PCLABEL" %in% names(lab))
+  expect_error(column_labels(m, list(CHG = "")), "labels: CHG needs a label")
+})

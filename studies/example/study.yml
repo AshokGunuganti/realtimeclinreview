@@ -23,6 +23,45 @@ thresholds:
 # mapping always run and show only on the Data load page.
 check_spec: check_spec.xlsx
 
+# Column headings for derived variables (mapped variables take theirs from
+# the LABEL column of the mapping spec). Unlabelled columns show their name.
+labels:
+  ENRLDT: Enrollment date
+  TRTSDT: First dose date
+  PLANDY1: Planned Day 1
+  LSTCNTDT: Last contact date
+  EOSSTT: Subject status
+  EOSDT: End of study date
+  DCSREAS: Reason for discontinuation
+  ASTDT: Start date (imputed)
+  ASTDTF: Start date imputation
+  ASTDY: Start study day
+  ADY: Study day
+  TRTEMFL: Treatment emergent
+  WORSTFL: Worst severity
+  APERIODC: Period
+  AVISIT: Analysis visit
+  AVISITN: Analysis visit number
+  ATDIFF: Days from target
+  AWINFL: In visit window
+  DOSAPPL: Doses applied
+  COMPPCT: Compliance (%)
+  ABLFL: Baseline record
+  BASE: Baseline value
+  BASESRC: Baseline source
+  APOSTFL: Post-baseline record
+  CHG: Change from baseline
+  PCHG: Percent change from baseline
+  AVAL: Analysis value
+  PCBLQFL: Below limit of quantitation
+
+# Data pulls before the study database held every cut: the simulated study had
+# ten transfers, about every six weeks, the last being the loaded extract.
+# Loaded cuts or extract folders are added to these. The subject profile marks
+# each pull. A regular schedule can be given instead as {start, every_days}.
+data_pulls:
+  dates: [2026-01-14, 2026-02-25, 2026-04-08, 2026-05-20, 2026-07-01, 2026-08-12, 2026-09-23, 2026-11-04, 2026-12-09]
+
 # Standard derivations, run in order on the as-of snapshot.
 derivations:
   - id: REF
@@ -110,29 +149,46 @@ team:
   - {id: sm, name: Study manager, role: Study manager}
 displays:
   - {id: actions, module: action_log, title: Action items}
-  - {id: review, module: review_queue, title: My review}
-  - {id: changes, module: monitored_changes, title: New and updated data}
+  # My review (module review_queue) is left out for now; add it back here.
+  # The high-level view: new and updated data across every clinical form, then the checks by area.
+  - {id: summary, module: review_summary, title: Review summary, params: {exclude_tiers: [structural]}}
+  # The implemented checks, as the check spec describes them; each opens the tab for its form.
+  - {id: checks, module: check_catalogue, title: Checks}
+  # One subject at a glance; reviewers choose what it shows.
+  - id: profile
+    module: subject_profile
+    title: Subject profile
+    highlight: true     # stands out in the sidebar: the reviewer's own view of one subject
+    params:
+      facts:
+        - {form: DM, field: SEX}
+        - {form: DM, field: AGE}
+        - {form: EX, field: EXTRT}
+      lanes:
+        - {type: visits, form: SV, day: ADY, label: FOLDER, title: Visits, not_done: {field: VISND, value: "Yes"}}
+        - type: events
+          form: AE
+          day: ASTDY
+          label: AEDECOD
+          level: AESEV
+          title: Adverse events
+          ongoing: {field: AEOUT, values: [NOT RECOVERED/NOT RESOLVED, RECOVERING/RESOLVING]}
+        - {type: series, form: MCSS, date: PHOTODT, value: MCSS, title: mCSS total, note: central read, ref: BASE, ref_label: baseline}
+        - {type: series, form: IGA, date: IGADAT, value: IGASCORE, title: IGA change, note: higher is better, ref: 0, ref_label: no change}
+        - {type: intervals, form: DIARY, start: DRYSTDAT, end: DRYENDAT, value: COMPPCT, unit: "%", title: Dosing compliance, note: "diary, % of doses", ref: compliance, ref_label: target}
+        - {type: series, form: PK, date: PCDTC, value: PCSTRESN, below: PCBLQFL, title: PK concentration, note: ng/mL, ref: lloq, ref_label: LLOQ}
 
-  # Subjects
-  - {id: subjects, module: subject_list, title: Subject list, group: Subjects}
+  # Study conduct
+  - {id: subjects, module: subject_list, title: Subject list, group: Study conduct}
   - id: visits
     module: visit_grid
     title: Visit status
-    group: Subjects
+    group: Study conduct
     params: &visits
       form: SV
       date: VISDAT
       not_done: {field: VISND, value: "Yes"}
       fallback: {TRTSDT: PLANDY1}
-  - id: profile
-    module: subject_profile
-    title: Subject profile
-    group: Subjects
-    params:
-      timeline:
-        - {form: SV, day: ADY, label: FOLDER}
-        - {form: AE, day: ASTDY, label: AETERM}
-
   # Safety
   - id: ae
     module: stack
@@ -144,7 +200,6 @@ displays:
         - {module: listing, title: AE listing, params: {form: AE}}
   - {id: pk, module: listing, title: PK, group: Safety, params: {form: PK}}
   - {id: diary, module: listing, title: Dosing diary, group: Safety, params: {form: DIARY}}
-  - {id: flags, module: check_results, title: Clinical flags, group: Safety, params: {tiers: [clinical]}}
 
   # Efficacy
   - id: mcss
@@ -162,7 +217,6 @@ displays:
     params: {form: IGA, value: IGASCORE, min_n: 3, y_label: IGA (change score)}
 
   # Data quality
-  - {id: checks, module: check_results, title: Data checks, group: Data quality, params: {tiers: [data, cross-form, reconciliation]}}
   - {id: queries, module: query_list, title: Queries, group: Data quality, params: {form: QUERY, query_age: 30}}
   - id: coding
     module: coding_review

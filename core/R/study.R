@@ -17,7 +17,10 @@
 #' @return A list: `id`, `dir`, `config`, `mapping`, `schedule`,
 #'   `extract_date`, `cut_id` (`NA` when read from a folder), `tables`,
 #'   `issues`, `checks`, `check_spec` (from
-#'   [read_check_spec()], or `NULL`), `derivations`, `thresholds`.
+#'   [read_check_spec()], or `NULL`), `derivations`, `thresholds`, `labels`
+#'   (column headings, from [column_labels()]), `extract` (the extract or cut
+#'   label) and `sources` (the source tables as read, by file name, before
+#'   mapping: the original values reviewers can compare against).
 #' @export
 load_study <- function(dir, extract = NULL) {
   cfg <- yaml::read_yaml(file.path(dir, "study.yml"))
@@ -35,7 +38,9 @@ load_study <- function(dir, extract = NULL) {
     extract_date = if (is.na(src$extract_dt)) as.Date(extract, optional = TRUE) else as.Date(src$extract_dt),
     cut_id = src$cut_id, tables = m$tables, issues = m$issues,
     checks = checks, check_spec = spec, derivations = define_derivations(cfg$derivations),
-    thresholds = if (is.null(cfg$thresholds)) list() else cfg$thresholds
+    thresholds = if (is.null(cfg$thresholds)) list() else cfg$thresholds,
+    labels = column_labels(mapping, if (is.null(cfg$labels)) list() else cfg$labels),
+    extract = extract, sources = src$sources
   )
 }
 

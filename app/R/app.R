@@ -38,6 +38,9 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
   profile_id <- if (length(profile)) names(profile)[1] else NA
   timeline <- if (length(profile)) profile[[1]]$params$timeline else list()
 
+  check_tabs <- check_tab_map(study, displays)
+  summary_id <- names(Filter(function(d) d$module == "review_summary", displays))[1]
+
   ui <- app_ui(study, displays, app_cfg, sites, subjects)
 
   server <- function(input, output, session) {
@@ -62,8 +65,18 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
         # Root session: called from inside modules, whose session would namespace "tabs".
         if (!is.na(profile_id)) bslib::nav_select("tabs", profile_id, session = session)
       },
-      goto_site = function(id) shiny::updateSelectInput(session, "site", selected = id)
+      goto_site = function(id) shiny::updateSelectInput(session, "site", selected = id),
+      check_tabs = check_tabs, tab_titles = lapply(displays, function(d) d$title),
+      check_focus = shiny::reactiveVal(NULL)
     )
+    # A check opens the tab for its form, picked there; one with no tab opens the review summary.
+    ctx$goto_check <- function(check) {
+      tab <- check_tabs[check]
+      target <- if (is.na(tab)) summary_id else tab
+      if (is.null(target) || is.na(target)) return(invisible())
+      ctx$check_focus(list(tab = unname(target), check = check, at = Sys.time()))
+      bslib::nav_select("tabs", unname(target), session = session)
+    }
     ctx$data <- shiny::reactive(filter_site(cache(asof()), ctx$site()))
     ctx$data_since <- shiny::reactive(filter_site(cache(ctx$since()), ctx$site()))
     ctx$record_hashes <- function(form) record_hash_table(study, form, asof())
@@ -82,6 +95,10 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
 
     # lapply, not for: each module must capture its own display's params (lazy evaluation).
     lapply(displays, function(d) d$def$server(d$id, ctx, d$params))
+    lapply(displays, function(d) {
+      ids <- display_checks(study, d)
+      if (length(ids)) form_checks_server(paste0("chk_", d$id), ctx, ids, d$id)
+    })
 
     load_id <- names(Filter(function(d) d$module == "data_load", displays))[1]
     output$load_banner <- shiny::renderUI({
@@ -135,16 +152,21 @@ rtcr_app <- function(study_dir, extract = NULL, user = NULL, store = NULL) {
 }
 
 app_ui <- function(study, displays, app_cfg, sites, subjects = character()) {
-  # Sidebar: every screen one click away, grouped under plain headings in the
-  # order the groups first appear; ungrouped screens head the list.
+  # Sidebar: ungrouped screens head the list; the rest sit in collapsible
+  # groups, in the order the groups first appear, all closed at the start so
+  # the list reads as a short outline. The open screen's group expands itself.
   groups <- vapply(displays, function(d) if (is.null(d$group)) "" else d$group, "")
   link <- function(d) {
-    shiny::tags$a(class = "side-link", href = paste0("?tab=", d$id), `data-value` = d$id,
+    shiny::tags$a(class = paste("side-link", if (isTRUE(d$highlight)) "side-featured"), href = paste0("?tab=", d$id),
+                  `data-value` = d$id,
                   onclick = "rtcrNav(this); return false;", shiny::span(d$title),
                   if (d$module == "review_queue") shiny::span(class = "side-count", shiny::textOutput("n_review", inline = TRUE)))
   }
   nav <- lapply(unique(groups), function(g) {
-    shiny::tagList(if (nzchar(g)) shiny::div(class = "side-group", g), unname(lapply(displays[groups == g], link)))
+    links <- unname(lapply(displays[groups == g], link))
+    if (!nzchar(g)) return(shiny::tagList(links))
+    shiny::tags$details(class = "side-sec", shiny::tags$summary(class = "side-group", g),
+                        shiny::div(class = "side-sec-links", links))
   })
   sidebar <- bslib::sidebar(
     width = 236, open = list(desktop = "open", mobile = "closed"), class = "side",
@@ -164,10 +186,13 @@ app_ui <- function(study, displays, app_cfg, sites, subjects = character()) {
       shiny::selectizeInput("find", "Find subject", c("", subjects), width = "140px",
                             options = list(placeholder = "Subject ID")),
       shiny::downloadButton("workbook", "Review workbook", class = "btn-sm btn-outline-primary", icon = NULL)))
-  panels <- lapply(displays, function(d) bslib::nav_panel_hidden(value = d$id, d$def$ui(d$id, d$params, study)))
+  panels <- lapply(displays, function(d) {
+    checks <- if (length(display_checks(study, d))) form_checks_ui(paste0("chk_", d$id))
+    bslib::nav_panel_hidden(value = d$id, checks, d$def$ui(d$id, d$params, study))
+  })
   bslib::page_sidebar(
     title = NULL, fillable = FALSE, sidebar = sidebar, window_title = paste(study$id, "data review"),
-    theme = bslib::bs_theme(version = 5, primary = "#2459c9", fg = "#16181d", bg = "#ffffff",
+    theme = bslib::bs_theme(version = 5, primary = "#0f5e57", fg = "#2b2620", bg = "#faf7f2",
                             base_font = bslib::font_google("IBM Plex Sans", local = FALSE),
                             code_font = bslib::font_google("IBM Plex Mono", local = FALSE),
                             "border-radius" = "6px", "font-size-base" = "0.9rem"),

@@ -2,7 +2,7 @@ skip_if_not(dir.exists(study_dir), "example study not available")
 skip_if_not_installed("RSQLite")
 
 test_that("library display modules are registered", {
-  expect_true(all(c("whats_new", "visit_grid", "over_time", "timeline", "listing", "check_results",
+  expect_true(all(c("whats_new", "visit_grid", "over_time", "timeline", "listing", "review_summary", "check_catalogue",
                     "subject_profile", "site_scorecard", "coding_review", "lock_readiness") %in% display_modules()))
 })
 
@@ -23,24 +23,32 @@ test_that("the example study's app builds with every configured screen", {
   displays <- resolve_displays(st$config$displays, review_cache(st)(st$extract_date))
   expect_equal(length(displays), length(st$config$displays))
   html <- as.character(app_ui(st, displays, st$config$app, c("101", "102")))
-  for (t in c("My review", "New and updated data", "Visit status", "mCSS over time", "AE listing", "Data checks",
-              "Clinical flags", "Subject profile", "Sites", "AE coding", "Lock readiness", "Sign-off", "Audit trail")) {
+  for (t in c("Action items", "Checks", "Visit status", "mCSS over time", "AE listing",
+              "Subject profile", "Sites", "AE coding", "Lock readiness", "Sign-off", "Audit trail")) {
     expect_match(html, t)
   }
+  expect_false(grepl("tab=review|tab=flags|tab=changes", html))         # folded into Checks, or out for now
 })
 
-test_that("the sidebar lists every screen under its group, in the order the groups first appear", {
+test_that("the sidebar lists every screen under a closed group, in the order the groups first appear", {
   st <- example_study()
   displays <- resolve_displays(st$config$displays, review_cache(st)(st$extract_date))
   html <- as.character(app_ui(st, displays, st$config$app, "101"))
-  groups <- regmatches(html, gregexpr('<div class="side-group">[^<]+</div>', html))[[1]]
-  expect_equal(gsub("<[^>]+>", "", groups), c("Subjects", "Safety", "Efficacy", "Data quality", "Operations",
-                                                "Close-out"))
-  links <- regmatches(html, gregexpr('class="side-link" href="\\?tab=[^"]+"', html))[[1]]
+  groups <- regmatches(html, gregexpr('<details class="side-sec">\\s*<summary class="side-group">[^<]+</summary>',
+                                      html))[[1]]
+  expect_equal(gsub("<[^>]+>|\\s{2,}|\n", "", groups), c("Study conduct", "Safety", "Efficacy", "Data quality",
+                                                         "Operations", "Close-out"))
+  expect_false(grepl("<details[^>]*open", html))                         # all start collapsed
+  ungrouped <- sub('<details class="side-sec".*', "", html)
+  expect_match(ungrouped, "tab=actions")                                  # ungrouped screens stay visible
+  expect_match(ungrouped, "tab=checks")
+  expect_match(ungrouped, 'class="side-link side-featured" href="\\?tab=profile"')   # its own tab, highlighted
+  expect_false(grepl("tab=mcss", ungrouped))
+  links <- regmatches(html, gregexpr('class="side-link[^"]*" href="\\?tab=[^"]+"', html))[[1]]
   expect_equal(sub('.*tab=', "", sub('"$', "", links)), names(displays))
   expect_match(html, "bslib-sidebar-layout")
   expect_false(grepl("navbar-nav", html))                                # no top menu bar
-  for (id in c("asof", "since", "site", "find", "workbook", "panel-oc", "n_review", "page_title")) {
+  for (id in c("asof", "since", "site", "find", "workbook", "panel-oc", "page_title")) {
     expect_match(html, sprintf('id="%s"', id))
   }
 })
@@ -58,6 +66,19 @@ test_that("what's new lists record and finding changes in the window", {
     expect_match(x$Review[1], "not reviewed")
     expect_s3_class(findings(), "data.frame")
   })
+})
+
+test_that("listings head their columns with labels, not variable names", {
+  ctx <- test_ctx()
+  shiny::testServer(listing_server, args = list(ctx = ctx, params = list(form = "AE")), {
+    x <- tbl()
+    expect_true(all(c("Reported term", "Severity", "Start study day", "Treatment emergent") %in% names(x)))
+    expect_false(any(c("AETERM", "AESEV", "ASTDY") %in% names(x)))
+    expect_true(".KEY" %in% names(x))
+  })
+  expect_equal(names(label_columns(data.frame(AESEV = 1), list())), "AESEV")      # a study without labels
+  expect_equal(changed_text(1, data.frame(RECID = 1, VARIABLE = "AESEV", OLD = "MILD", NEW = "MODERATE"),
+                            ctx$study$labels), "Severity: MILD \u2192 MODERATE")
 })
 
 test_that("marking selected rows writes review marks and refreshes the table", {
@@ -78,18 +99,147 @@ test_that("marking selected rows writes review marks and refreshes the table", {
   })
 })
 
-test_that("check results filter findings by the selected check", {
+test_that("the summary sends a check to its tab and keeps only checks with no tab", {
   ctx <- test_ctx()
-  shiny::testServer(checks_server, args = list(ctx = ctx, params = list()), {
-    all <- nrow(findings())
+  shiny::testServer(summary_server, args = list(ctx = ctx, params = list(exclude_tiers = list("structural"))), {
     s <- summary()
-    expect_equal(nrow(s), length(ctx$study$checks))
-    i <- which(s$Findings > 0)[1]
-    session$setInputs(`sum-tbl_rows_selected` = i)
-    expect_equal(nrow(findings()), s$Findings[i])
-    expect_true(all(findings()$CHECKID == s$ID[i]))
-    expect_lte(nrow(findings()), all)
+    expect_setequal(unique(findings()$CHECKID), intersect(c("DT-FUT", "DS-DISC"), s$ID[s$Findings > 0]))
+    session$setInputs(pick = "AE-SEV")                                     # has a tab: opens it, picked there
+    expect_equal(ctx$check_focus()$tab, "ae")
+    expect_equal(ctx$check_focus()$check, "AE-SEV")
+    session$setInputs(pick = "DS-DISC")                                    # no tab: its findings stay here
+    expect_true(all(findings()$CHECKID == "DS-DISC"))
+    expect_equal(nrow(findings()), s$Findings[s$ID == "DS-DISC"])
+    session$setInputs(all = 1)
+    expect_false("AE-SEV" %in% findings()$CHECKID)
   })
+})
+
+test_that("each check links to the first tab that shows its form", {
+  st <- example_study()
+  tabs <- check_tab_map(st, st$config$displays)
+  expect_equal(unname(tabs[c("AE-SEV", "AE-COD", "EX-COMP", "CL-PK-001", "CL-IGA-001", "VS-MISS")]),
+               c("ae", "ae", "diary", "pk", "iga", "visits"))
+  expect_true(all(is.na(tabs[c("DS-DISC", "DT-FUT")])))                    # no screen shows DS; DT-FUT has no form
+  expect_false(any(grepl("^STR-", names(tabs))))                         # programmer checks never link
+  coding <- Filter(function(d) d$id == "coding", st$config$displays)[[1]]
+  expect_true(all(c("AE-SEV", "AE-COD") %in% display_checks(st, coding)))  # every screen with the form carries them
+  profile <- Filter(function(d) d$id == "profile", st$config$displays)[[1]]
+  expect_length(display_checks(st, profile), 0)                           # the profile is the reviewer's own view
+})
+
+test_that("a tab's checks card lists its checks and is picked from a check link", {
+  ctx <- test_ctx()
+  shiny::testServer(form_checks_server, args = list(ctx = ctx, check_ids = c("EX-COMP", "DM-DRY-001"), tab = "diary"), {
+    expect_true(all(tbl()$Check %in% c("EX-COMP", "DM-DRY-001")))
+    expect_match(output$chips$html, "All checks")
+    expect_match(output$chips$html, "Low dosing compliance")
+    ctx$check_focus(list(tab = "diary", check = "EX-COMP", at = Sys.time()))
+    session$flushReact()
+    expect_equal(picked(), "EX-COMP")
+    expect_true(all(tbl()$Check == "EX-COMP"))
+    ctx$check_focus(list(tab = "pk", check = "CL-PK-001", at = Sys.time()))  # another tab's check: ignored
+    session$flushReact()
+    expect_equal(picked(), "EX-COMP")
+    session$setInputs(pick = "")
+    expect_null(picked())
+  })
+})
+
+test_that("the checks catalogue lists active checks with their change record and tab", {
+  ctx <- test_ctx()
+  cat <- shiny::isolate(check_catalogue(ctx$study, ctx$data(), character(), ctx$check_tabs, ctx$tab_titles))
+  expect_false(any(grepl("^STR-", cat$ID)))
+  expect_true(all(cat$Status == "active"))
+  ex <- cat[cat$ID == "EX-COMP", ]
+  expect_equal(ex$Tab, "Dosing diary")
+  expect_equal(ex$Description, "Dosing interval with compliance below the study threshold")
+  expect_equal(ex$Reason, "Standard check")
+  expect_true(is.na(cat$Tab[cat$ID == "DS-DISC"]))
+
+  # A retired row in the spec stays listed, with its reason.
+  st <- ctx$study
+  extra <- st$check_spec$table[st$check_spec$table$ID == "EX-COMP", ]
+  extra$ID <- "EX-COMP-OLD"
+  extra$STATUS <- "retired"
+  extra$REASON <- "Threshold moved to 80%"
+  st$check_spec$table <- rbind(st$check_spec$table, extra)
+  cat2 <- shiny::isolate(check_catalogue(st, ctx$data(), character(), ctx$check_tabs, ctx$tab_titles))
+  old <- cat2[cat2$ID == "EX-COMP-OLD", ]
+  expect_equal(old$Status, "retired")
+  expect_equal(old$Reason, "Threshold moved to 80%")
+
+  shiny::testServer(catalogue_server, args = list(ctx = ctx, params = list()), {
+    html <- output$groups$html
+    expect_match(html, "Open Dosing diary")
+    expect_match(html, "Findings on the review summary")
+    expect_false(grepl("accordion-collapse collapse show", html))
+    session$setInputs(open = "CL-PK-001")
+    expect_equal(ctx$check_focus()$tab, "pk")
+  })
+})
+
+test_that("new and updated data is the first check, across every clinical form", {
+  ctx <- test_ctx()
+  shiny::testServer(summary_server, args = list(ctx = ctx, params = list(exclude_tiers = list("structural"))), {
+    fc <- form_counts()
+    expect_equal(fc$Form, clinical_forms(ctx$study))
+    expect_false(any(c("QUERY", "FSTAT") %in% fc$Form))                  # operational reports left out
+    expect_gt(sum(fc$Total), 0)
+    html <- output$groups$html
+    expect_lt(regexpr("New and updated data", html), regexpr("Safety", html))   # first area
+    expect_match(output$headline$html, "new or updated records")
+
+    f <- fc$Form[fc$Total > 0][1]
+    session$setInputs(pick_form = f)
+    expect_equal(output$view, paste0("form:", f))
+    session$setInputs(all = 1)
+    expect_equal(output$view, "findings")
+
+    # Findings say when their record is itself new or updated.
+    x <- tbl()
+    keys <- changed_keys()
+    on_changed <- paste0(findings()$FORMOID, ":", findings()$RECID) %in% names(keys)
+    expect_true(any(on_changed))
+    expect_true(all(nzchar(x$Record[on_changed])))
+    expect_true(all(x$Record[!on_changed] == ""))
+  })
+})
+
+test_that("changed records list the other checks that flag them", {
+  ctx <- test_ctx()
+  shiny::testServer(listing_server, args = list(ctx = ctx, params = list(form = "AE", show = "changes", flagged_by = TRUE)), {
+    x <- tbl()
+    expect_true("Also flagged by" %in% names(x))
+    expect_true(all(x$RECSTAT != "Unchanged"))
+    expect_true(any(grepl("AE-NEW", x$`Also flagged by`)))
+  })
+  shiny::isolate({
+    rd <- ctx$data()
+    f <- rd$findings[!is.na(rd$findings$FORMOID), ][1, ]
+    key <- paste0(f$FORMOID, ":", f$RECID)
+    expect_match(flagged_by(rd, key), f$CHECKID)
+    expect_equal(flagged_by(rd, "AE:nope"), "")
+  })
+})
+
+test_that("the checks screen groups every review check by area, all closed at first", {
+  ctx <- test_ctx()
+  shiny::testServer(summary_server, args = list(ctx = ctx, params = list(exclude_tiers = list("structural"))), {
+    s <- summary()
+    expect_true(all(c("clinical", "data") %in% s$Tier))
+    expect_false(any(s$Tier == "structural"))
+    g <- check_groups(s)
+    expect_equal(names(g)[1:2], c("Safety", "Efficacy"))
+    expect_setequal(unlist(lapply(g, function(x) x$ID)), s$ID)
+    expect_true(all(c("CL-IGA-001", "XF-IGA-001", "RC-MCSS-001") %in% c(g$Efficacy$ID, g$Data$ID)))
+    html <- output$groups$html
+    expect_match(html, "accordion")
+    expect_false(grepl("accordion-collapse collapse show", html))       # every area starts collapsed
+    expect_match(output$headline$html, "\\d+ checks")
+  })
+  expect_equal(names(check_groups(data.frame(Category = c("Zeta", "Safety", "Alpha"), New = 0, Findings = 0))),
+               c("Safety", "Alpha", "Zeta"))
 })
 
 test_that("visit grid has one row per subject and one column per visit", {
@@ -137,7 +287,7 @@ test_that("Excel export writes the data and an About sheet, and logs the export"
 test_that("subject profile follows subject links", {
   ctx <- test_ctx()
   shiny::testServer(profile_server, args = list(ctx = ctx, params = list(
-    timeline = list(list(form = "AE", day = "ASTDY", label = "AETERM")))), {
+    lanes = list(list(type = "events", form = "AE", day = "ASTDY", label = "AEDECOD")))), {
     ctx$goto_subject("102-001")
     session$flushReact()
     session$setInputs(subject = "102-001")

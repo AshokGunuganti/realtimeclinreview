@@ -106,7 +106,7 @@ sites_server <- function(id, ctx, params) {
       shiny::validate(shiny::need(nrow(s) > 0, "No visits entered yet."))
       s <- s[order(s$LAGMED), , drop = FALSE]
       p <- plotly::plot_ly(s, y = ~factor(SITEID, levels = SITEID), x = ~LAGMED, type = "bar", orientation = "h",
-                           marker = list(color = ifelse(s$LAGMED > target, "#d03b3b", "#2a78d6")),
+                           marker = list(color = ifelse(s$LAGMED > target, "#d03b3b", "#0f5e57")),
                            text = ~sprintf("Site %s: median %g days, %g%% within target", SITEID, LAGMED, PCTLAG),
                            hoverinfo = "text", textposition = "none")
       plotly::layout(p, xaxis = list(title = "Median days from visit to entry"), yaxis = list(title = "Site"),

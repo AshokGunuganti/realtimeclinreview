@@ -6,7 +6,8 @@
 overtime_ui <- function(id, params, study) {
   ns <- shiny::NS(id)
   shiny::tagList(
-    bslib::card(fill = FALSE, bslib::card_header(if (is.null(params$title)) params$value else params$title),
+    bslib::card(fill = FALSE,
+                bslib::card_header(if (is.null(params$title)) col_label(params$value, study) else params$title),
                 plotly::plotlyOutput(ns("plot"), height = "420px")),
     table_card_ui(ns("sum"), "Summary by visit")
   )
@@ -57,9 +58,9 @@ overtime_server <- function(id, ctx, params) {
       s <- s[s$N >= min_n, , drop = FALSE]
       if (nrow(s)) {
         p <- plotly::add_trace(p, data = s, x = ~X, y = ~MEAN, type = "scatter", mode = "lines+markers",
-                               line = list(color = "#2a78d6", width = 3), marker = list(color = "#2a78d6", size = 8),
+                               line = list(color = "#0f5e57", width = 3), marker = list(color = "#0f5e57", size = 8),
                                error_y = list(type = "data", symmetric = FALSE, array = s$HI - s$MEAN,
-                                              arrayminus = s$MEAN - s$LO, color = "#2a78d6"),
+                                              arrayminus = s$MEAN - s$LO, color = "#0f5e57"),
                                name = sprintf("Mean (95%% CI, n >= %d)", min_n), hoverinfo = "text",
                                text = ~sprintf("%s: mean %.2f, n = %d", vis_label(VISITNUM), MEAN, N))
       }

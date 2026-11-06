@@ -22,7 +22,15 @@ test_ctx <- function(asof = "2026-12-31", since = "2026-10-22", site = "All site
               site = shiny::reactive(site), marks_rev = rev, bump_marks = function() rev(rev() + 1),
               selected_subject = picked, panel_subject = panel,
               goto_subject = function(id) panel(id), open_profile = function(id) picked(id),
-              goto_site = function(id) NULL, timeline = list(list(form = "AE", day = "ASTDY", label = "AETERM")))
+              goto_site = function(id) NULL, timeline = list(list(form = "AE", day = "ASTDY", label = "AETERM")),
+              check_focus = shiny::reactiveVal(NULL))
+  displays <- lapply(study$config$displays, function(d) d)
+  ctx$check_tabs <- check_tab_map(study, displays)
+  ctx$tab_titles <- stats::setNames(lapply(displays, function(d) d$title), vapply(displays, function(d) d$id, ""))
+  ctx$goto_check <- function(check) {
+    tab <- ctx$check_tabs[check]
+    ctx$check_focus(list(tab = unname(if (is.na(tab)) "summary" else tab), check = check, at = Sys.time()))
+  }
   ctx$data <- shiny::reactive(filter_site(cache(asof), site))
   ctx$data_since <- shiny::reactive(filter_site(cache(since), site))
   ctx$record_hashes <- function(form) record_hash_table(study, form, as.Date(asof))

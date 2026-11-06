@@ -154,7 +154,8 @@ review_workbook <- function(rd, study, file, about, con = NULL, since = NULL) {
     o <- order(match(fc$status, c("New", "Changed", "Deleted", "Unchanged")), t$SUBJID)
     t <- t[o, , drop = FALSE]
     st <- fc$status[o]
-    d <- data.frame(Status = ifelse(st == "Unchanged", "", status_label(st)), Changed = changed_text(t$RECID, fc$fields),
+    d <- data.frame(Status = ifelse(st == "Unchanged", "", status_label(st)),
+                    Changed = changed_text(t$RECID, fc$fields, study$labels),
                     Subject = t$SUBJID, Site = t$SITEID, check.names = FALSE, stringsAsFactors = FALSE)
     d <- cbind(d, as.data.frame(lapply(t[cols], function(v) {
       v <- as.character(fmt_cell(v))
@@ -176,7 +177,7 @@ review_workbook <- function(rd, study, file, about, con = NULL, since = NULL) {
     openxlsx::writeFormula(wb, sh, startCol = 1, startRow = 2,
                            x = openxlsx::makeHyperlinkString(sheet = "Contents", row = 1, col = 1, text = "Back to contents"))
     openxlsx::addStyle(wb, sh, link, rows = 2, cols = 1)
-    table(sh, d, 4)
+    table(sh, label_columns(d, study), 4)
     for (k in c("New", "Changed", "Deleted")) {
       rows <- 4 + which(st == k)
       if (length(rows)) {

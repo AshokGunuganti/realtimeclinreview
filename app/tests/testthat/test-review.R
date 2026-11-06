@@ -161,11 +161,11 @@ test_that("stacked displays render and run each item", {
 
 test_that("check results can show only some tiers", {
   ctx <- test_ctx()
-  shiny::testServer(checks_server, args = list(ctx = ctx, params = list(tiers = list("clinical"))), {
+  shiny::testServer(summary_server, args = list(ctx = ctx, params = list(tiers = list("clinical"))), {
     expect_true(all(summary()$Tier == "clinical"))
     expect_true(all(findings()$CHECKID %in% summary()$ID))
   })
-  shiny::testServer(checks_server, args = list(ctx = ctx, params = list(exclude_tiers = list("clinical"))), {
+  shiny::testServer(summary_server, args = list(ctx = ctx, params = list(exclude_tiers = list("clinical"))), {
     expect_false(any(summary()$Tier == "clinical"))
     expect_gt(nrow(summary()), 0)
   })
@@ -218,7 +218,7 @@ test_that("sign-off waits until everything is reviewed, then records the scope",
 
 test_that("programmer checks stay off review screens and show on the data load page", {
   ctx <- test_ctx()
-  shiny::testServer(checks_server, args = list(ctx = ctx, params = list(tiers = list("data", "cross-form",
+  shiny::testServer(summary_server, args = list(ctx = ctx, params = list(tiers = list("data", "cross-form",
                                                                                      "reconciliation"))), {
     expect_false(any(grepl("^STR-", summary()$ID)))
     expect_true(all(c("Category", "New", "Result") %in% names(summary())))
@@ -318,7 +318,7 @@ test_that("the workbook has a coloured sheet per monitored form", {
   expect_match(d$Changed[d$Status == "Updated"][1], "→")
   wb <- openxlsx::loadWorkbook(path)
   fills <- vapply(wb$styleObjects, function(s) if (s$sheet == "Data MCSS") s$style$fill$fillFg[[1]] %||% "" else "", "")
-  expect_true(any(grepl("D9E8FC", fills, ignore.case = TRUE)))            # new
+  expect_true(any(grepl("D8EBE3", fills, ignore.case = TRUE)))            # new
   expect_true(any(grepl("FFF0C2", fills, ignore.case = TRUE)))            # updated
   expect_true(any(grepl("FFCF5C", fills, ignore.case = TRUE)))            # changed value
   toc <- openxlsx::read.xlsx(path, "Contents", colNames = FALSE, skipEmptyRows = FALSE)

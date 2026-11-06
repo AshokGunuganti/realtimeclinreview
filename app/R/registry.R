@@ -35,7 +35,7 @@ resolve_displays <- function(config, data) {
     title <- if (is.null(d$title)) d$id else d$title
     if (is.null(params$title)) params$title <- title         # modules title their cards with it
     out[[d$id]] <- list(id = d$id, title = title, module = d$module, group = d$group,
-                        params = params, def = def)
+                        highlight = isTRUE(d$highlight), params = params, def = def)
   }
   out
 }
@@ -48,7 +48,8 @@ has_fields <- function(data, form, fields = character()) {
 register_library_displays <- function() {
   register_display("whats_new", whatsnew_ui, whatsnew_server)
   register_display("listing", listing_ui, listing_server, function(p, data) has_fields(data, p$form, p$columns))
-  register_display("check_results", checks_ui, checks_server, function(p, data) nrow(data$summary) > 0)
+  register_display("review_summary", summary_ui, summary_server, function(p, data) nrow(data$summary) > 0)
+  register_display("check_catalogue", catalogue_ui, catalogue_server)
   register_display("over_time", overtime_ui, overtime_server, function(p, data) has_fields(data, p$form, p$value))
   register_display("visit_grid", visitgrid_ui, visitgrid_server,
                    function(p, data) has_fields(data, p$form, p$date) && !is.null(data$adsl))

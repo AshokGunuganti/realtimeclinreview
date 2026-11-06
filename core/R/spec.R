@@ -38,7 +38,8 @@ spec_sheets <- list(
 #'   is comma-separated; `ARGS` is `name=value; name=value`; `REQUIRED` is
 #'   `Y` when the source fields must exist in the extract. Rows with
 #'   transform `filter` or `pivot` reshape the source before any field is
-#'   mapped and leave `VARIABLE` blank.
+#'   mapped and leave `VARIABLE` blank. An optional `LABEL` column gives the
+#'   column heading reviewers see in place of the variable name.
 #' * **Codelists**: `CODELIST`, `CODE`, `DECODE`.
 #'
 #' @param xlsx Path to the spec workbook.
@@ -78,7 +79,8 @@ compile_spec <- function(xlsx, yml = NULL, ...) {
            transform = rows$TRANSFORM[j],
            args = parse_args(rows$ARGS[j]),
            required = identical(toupper(rows$REQUIRED[j]), "Y"),
-           notes = rows$NOTES[j])
+           notes = rows$NOTES[j],
+           label = if (is.null(rows$LABEL)) NA_character_ else rows$LABEL[j])
     })
     step <- vapply(entries, function(e) !is.na(e$transform) && e$transform %in% c("filter", "pivot"), logical(1))
     forms[[id]] <- list(
@@ -120,6 +122,7 @@ read_mapping <- function(yml, ...) {
     e$source <- as.character(unlist(e$source))
     e$args <- lapply(e$args, as.character)
     if (is.null(e$args)) e$args <- list()
+    if (is.null(e$label)) e$label <- NA_character_
     e
   }
   for (id in names(m$forms)) {
@@ -132,6 +135,34 @@ read_mapping <- function(yml, ...) {
   m$codelists <- lapply(m$codelists, function(cl) lapply(cl, as.character))
   validate_mapping(m, ...)
   m
+}
+
+# Headings for the header variables every form carries.
+header_labels <- c(
+  STUDYID = "Study", SITEID = "Site", SUBJID = "Subject", ENTRYDT = "Entered", UPDDT = "Last updated",
+  AVAILDT = "Available", FOLDER = "Visit", VISITNUM = "Visit number", FORMOID = "Form", RECID = "Record",
+  VERSION = "Version", DELFL = "Deleted")
+
+#' Column labels
+#'
+#' The headings reviewers see in place of variable names: `labels` from
+#' study.yml (for derived variables, or to override), then the spec's
+#' `LABEL` column (the first form that labels a variable wins), then the
+#' standard header labels. Variables with no label keep their name.
+#'
+#' @param mapping A compiled mapping.
+#' @param labels Named list of variable = label, from study.yml.
+#' @return A named character vector, variable = label.
+#' @export
+column_labels <- function(mapping, labels = list()) {
+  blank <- vapply(labels, function(l) !is.character(l) || length(l) != 1 || is.na(l) || !nzchar(trimws(l)), logical(1))
+  if (any(blank)) stop("labels: ", paste(names(labels)[blank], collapse = ", "), " needs a label.", call. = FALSE)
+  fields <- unlist(lapply(mapping$forms, function(f) f$fields), recursive = FALSE)
+  spec <- stats::setNames(vapply(fields, function(e) if (is.null(e$label)) NA_character_ else e$label, ""),
+                          vapply(fields, function(e) e$variable, ""))
+  spec <- spec[!is.na(spec)]
+  out <- c(unlist(labels), spec[!duplicated(names(spec))], header_labels)
+  out[!duplicated(names(out))]
 }
 
 #' Validate a mapping

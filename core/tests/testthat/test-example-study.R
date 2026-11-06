@@ -145,3 +145,22 @@ test_that("example study review cycle: mark, sign off, come back after the next 
   expect_true("EX-COMP" %in% dec$CHECKID[dec$FINDSTAT == "Changed"])     # the same diary change lowers compliance
   expect_equal(nrow(audit_trail(con, st$study_id)), nrow(oct) + 1)
 })
+
+test_that("every column of the example study has a label", {
+  skip_if_not(dir.exists(study), "example study not available")
+  s <- load_study(study)
+  d <- derive_snapshot(s$tables, s$derivations, s$extract_date, s$schedule, s$thresholds)
+  cols <- unique(c(unlist(lapply(d$tables, names)), names(d$adsl)))
+  cols <- cols[!grepl("SRC$", cols)]
+  expect_equal(setdiff(cols, names(s$labels)), character())
+})
+
+test_that("the loaded study keeps its source tables as read, by file", {
+  skip_if_not(dir.exists(study), "example study not available")
+  s <- load_study(study)
+  expect_equal(s$extract, "2026-12-31")
+  expect_true(all(c("edc_ae.csv", "vendor_pk.csv") %in% names(s$sources)))
+  pk <- s$sources[["vendor_pk.csv"]]
+  expect_true("SUBJID" %in% names(pk))
+  expect_true(all(vapply(pk, is.character, logical(1))))               # values as they arrived, not converted
+})

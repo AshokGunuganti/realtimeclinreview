@@ -189,7 +189,7 @@ panel_body <- function(ctx, s, timeline = list()) {
     st <- chg$RECSTAT[chg$FORMOID == f][match(t$RECID, chg$RECID[chg$FORMOID == f])]
     shiny::tags$details(class = "panel-all",
                         shiny::tags$summary(shiny::span(f), shiny::span(class = "note", sprintf("%d record(s)", nrow(t)))),
-                        html_table(record_cells(t), row_class = row_classes(st)))
+                        html_table(label_columns(record_cells(t), ctx$study), row_class = row_classes(st)))
   })
   shiny::tagList(
     sections,
@@ -211,7 +211,7 @@ changed_records <- function(ctx, form, s, x, since) {
   keep <- fc$rows$SUBJID == s & fc$rows$RECID %in% x$RECID
   t <- fc$rows[keep, , drop = FALSE]
   st <- fc$status[keep]
-  cells <- mark_changed_cells(record_cells(t), t$RECID, fc$fields)
+  cells <- label_columns(mark_changed_cells(record_cells(t), t$RECID, fc$fields), ctx$study)
   cells <- cbind(data.frame(Status = badge(status_label(st)), stringsAsFactors = FALSE), cells)
   html_table(cells, row_class = row_classes(st))
 }
