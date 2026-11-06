@@ -1,6 +1,6 @@
 # Real-Time Clinical Data Review Framework: Design
 
-Working design, October 2026
+Working design, November 2026
 
 ## Purpose and scope
 
@@ -28,16 +28,54 @@ Three goals decide every trade-off: a **small team can maintain it**, it is **fi
 4. **Configure, don't code.** Mapping, checks and displays are driven by a study's spec and config. Code changes only when a genuinely new capability is needed.
 5. **Build once, reuse per study.** A form library of standard forms, with their checks and displays, makes each new study mostly configuration.
 6. **One pipeline, many outputs.** All logic (derivations, checks, as-of views, role filtering) lives in the validated core package; the app, the Excel workbook and PDF profiles only present its results, so they always agree.
-7. **Review needs an owner.** The framework records who reviewed what and when, not just what the data shows.
+7. **Review needs an owner.** The framework records who reviewed what and when, what needs follow-up, who owns it and what was done, not just what the data shows.
 8. **No real data in the repository.** Examples and tests use simulated data only.
+9. **Sources can change.** Screens, checks and patient lists read only standard forms, never a vendor's file layout, so a new EDC, lab or vendor means a new connector and mapping rows, not new screens.
+
+## Weekly review cycle
+
+The app is built around one weekly meeting. Each week a new data cut is loaded and the study team meets to review it:
+
+1. **Open action items first.** Everything raised at earlier meetings and not yet closed, with what its owner has done since, and items closed since the last meeting.
+2. **New and updated data.** Records new, changed or deleted since the previous cut, and check findings that are new or changed, clearly marked.
+3. **Review by area.** Study conduct, dosing, safety, efficacy, data entry and data quality, for the whole study and compared across sites. The team's checks for each area are rows in the check spec, agreed before the first meeting.
+4. **Patient review.** Lists of patients who meet defined criteria (an SAE, a CTCAE grade 3 or 4 AE, low dosing compliance), and each patient's data and graphic profile.
+5. **Actions and minutes.** Anything needing follow-up becomes an action item with an owner and a due date. The meeting's attendees, minutes and action log are exported for the study file.
+
+The first meeting reviews all data, since everything is new. From then on each meeting starts from the open actions and the changes since the previous cut. Cuts, meetings, action items and review marks are all kept in the study database, so any earlier meeting can be reopened as it stood.
 
 ## Architecture overview
 
-A scheduled pipeline runs the core package on each extract: it builds the versioned collected data model, then the as-of views, derivations and checks, and caches the results. The app, the Excel workbook and PDF profiles only present those results, so they never disagree.
+A scheduled pipeline loads each weekly cut into the study database: the raw files as delivered, then the versioned collected data model, then load-time checks. The core package computes as-of views, derivations and checks from the database, and the app, the Excel workbook and PDF profiles only present those results, so they never disagree. The same database holds review state: marks, action items, meetings and sign-off.
+
+```
+Sources (EDC, labs, vendors; chosen per study)
+  → connector per source type → raw staging, one copy per cut
+  → mapping spec → standard forms (collected data model)
+  → derivations → checks → patient lists
+  → app screens, review workbook, profiles
+```
 
 *(Architecture diagram: see the layer list below; an SVG will be added under docs/.)*
 
-The validation boundary is drawn by package, not by where code runs. The core package holds everything that decides what a reviewer sees (connectors, mapping, as-of engine, derivations, checks, the review-state API and output writers) and is validated. The app package only renders screens and records review actions through the core API.
+The validation boundary is drawn by package, not by where code runs. The core package holds everything that decides what a reviewer sees (connectors, mapping, as-of engine, derivations, checks, patient lists, the review-state and action API and output writers) and is validated. The app package only renders screens and records review actions through the core API.
+
+## Study database
+
+Everything the review depends on is kept in one database per installation, written through R's standard database layer (DBI): Postgres in production, SQLite for demos and tests. Which database and who hosts it is still open (see Roadmap); nothing outside the database layer depends on the choice.
+
+| Area | Tables | Holds |
+| --- | --- | --- |
+| Cuts | `cut`, `cut_file`, raw staging per source | One row per weekly cut (received, files, checksums, row counts, intake result) and every raw row as delivered, tagged with its cut |
+| Collected data | One table per standard form | The versioned collected data model, with the standard header; AVAILDT comes from the cut |
+| Results | `finding` | Check findings per cut, cached by the pipeline, so cuts can be compared without recomputing |
+| Study team | `team_member` | Name, role, email and active flag; action owners need not have a login |
+| Meetings | `meeting`, `meeting_attendee` | One meeting per cut: date, attendees, minutes |
+| Action items | `action_item`, `action_update` | Follow-ups and every update to them |
+| Review | `review_mark`, `signoff`, `audit_trail`, `access_log` | Review marks, sign-off, the audit trail and views and exports |
+| Saved views | `saved_filter`, `profile_layout` | Patient lists and profile layouts a reviewer saved |
+
+Every table is insert-only: a change adds a row, and the current state is the latest row per key. Raw cuts are never changed or removed, so a mapping fix can be rerun on every earlier cut and any review can be reproduced exactly.
 
 ## Collected data model
 
@@ -86,8 +124,11 @@ studies/<study>/
   study.yml            sources, thresholds, roles, enabled checks and displays
   visit_schedule.csv   visits, nominal days, windows, EDC folders, vendor visit labels
   mapping_spec.xlsx    source field -> CDM variable, one row per field (compiled to mapping.yml)
-  extracts/            raw files or API cache, one folder per extract date
+  check_spec.xlsx      review checks and patient lists, owned by the study team
+  plugins/             optional study-specific connectors, checks, derivations and screens
 ```
+
+Weekly cuts are not kept in the study folder: they are dropped in a secure folder and loaded into the study database (see Pipeline).
 
 **Mapping spec.** Data managers and programmers author it in Excel; the pipeline compiles it to YAML and validates it against a schema before running. Each row: target form, target variable, source, source field(s), transform, transform arguments, required flag, notes.
 
@@ -110,7 +151,11 @@ studies/<study>/
 | constant | Fixed value | FORMOID = VENDOR\_PK |
 | derive | Named, registered R function for anything else | study\_day |
 
-**Connectors.** A connector turns one source system into landing tables with the standard header filled. Version 1 ships a Medrio connector and a generic CSV/SAS connector; CDISC ODM follows, covering most other EDCs. Each connector records a parse log for anything it could not read.
+**Readable labels.** The Mapping sheet also carries a LABEL per target variable (`AETOXGR`: "CTCAE grade"). Screens and the workbook show labels, with the variable name on hover, so data keeps its CDASH names while reviewers read plain words. A form can also give a one-line summary in study.yml (`summary: "{AEDECOD} | Grade {AETOXGR} | {AEREL}"`), used wherever a record is listed briefly: the changes feed, action items and profiles.
+
+**Connectors.** A connector turns one source system into landing tables with the standard header filled. Connectors are registered by name, like checks and display modules, and each study's sources name the connector to use; a new EDC, lab or vendor is a new connector plus mapping rows, and a study can register its own in its plugins folder. Version 1 ships a Medrio connector and a generic CSV/SAS connector; CDISC ODM follows, covering most other EDCs. Each connector records a parse log for anything it could not read.
+
+**Form contracts.** Each form in the form library has a contract: its form type and the fields it requires or may carry, with their meaning (an AE form requires AETERM, AESTDAT and AESER; AETOXGR is optional and needed for grade lists). Loading checks mapped data against the contract. Screens, checks and patient lists declare what they need in contract fields, so a study whose AE form has no grade simply has no grade 3/4 list, and a study with no lab feed has no lab screens.
 
 **Medrio connector (version 1).** Built on scheduled exports, not the API. Medrio's public API is designed mainly for writing data (data entry, subjects, users, bulk upload) and reads only one subject's form at a time, so it is not suited to pulling a whole study. Its exports fit this design closely:
 
@@ -173,7 +218,7 @@ Checks are registered, not hard-coded. Each check is metadata plus one function,
 
 **Two audiences.** *Review checks* look at the study data being collected: new and changed AEs, serious and severe AEs, low dosing compliance, missed, overdue and out-of-window visits, discontinuations, dates after the data cut, study rules such as a PK alert, and data issues sites must fix. They are what reviewers see on screen and in the workbook. *Programmer checks* (the structural tier, STR-001 to STR-006) test that the extract loaded and mapped cleanly. They always run, but appear only on the Data load page; reviewers see a one-line banner when one fails or a check cannot run, because data may then be missing. They never go into the review workbook.
 
-**Check spec.** Review checks live in a check spec workbook (`check_spec.xlsx`, named by study.yml `check_spec`), separate from the mapping spec, so the review team owns them. Every study starts from the canned set (`canned_checks()`, written by `write_check_spec()`), which uses standard collected variable names; the team then adds rows, changes forms, fields, conditions and thresholds, and retires rows, without programming. One row per check: ID, name, description, category (Safety, Dosing, Visits, Disposition, Efficacy, Data), tier (`clinical` for medical review, `data` for data issues), type, form, field, conditions in plain text (`AESER == Y; AESEV in MODERATE, SEVERE`; `$name` reads a study threshold), other settings (`name=value; ...`), message, severity, owner, status (`active` or `retired`) and the last change (on, by, reason). Rows are retired, never deleted, so the sheet is the history; the file itself is versioned with the study. A row the app cannot read (an unknown type, a mistyped condition, a duplicate ID) is skipped and listed on the Data load page, and a check that fails on the data (a field the form does not have) shows as *not run* with the reason; neither stops the other checks. The workbook carries a Check types help sheet and a How to sheet, with drop-down lists for type, tier, severity, owner and status.
+**Check spec.** Review checks live in a check spec workbook (`check_spec.xlsx`, named by study.yml `check_spec`), separate from the mapping spec, so the review team owns them. Every study starts from the canned set (`canned_checks()`, written by `write_check_spec()`), which uses standard collected variable names; the team then adds rows, changes forms, fields, conditions and thresholds, and retires rows, without programming. One row per check: ID, name, description, review area (Conduct, Dosing, Safety, Efficacy, Data entry, Data quality; today's canned set still uses the earlier categories Safety, Dosing, Visits, Disposition, Efficacy and Data), tier (`clinical` for medical review, `data` for data issues), type, form, field, conditions in plain text (`AESER == Y; AESEV in MODERATE, SEVERE`; `$name` reads a study threshold), other settings (`name=value; ...`), message, severity, owner, status (`active` or `retired`) and the last change (on, by, reason). Rows are retired, never deleted, so the sheet is the history; the file itself is versioned with the study. A row the app cannot read (an unknown type, a mistyped condition, a duplicate ID) is skipped and listed on the Data load page, and a check that fails on the data (a field the form does not have) shows as *not run* with the reason; neither stops the other checks. The workbook carries a Check types help sheet and a How to sheet, with drop-down lists for type, tier, severity, owner and status.
 
 **New, changed and back for review.** Every check flags each record that meets its condition on the review date, so "new AE" is the AE check's findings that are new since the earlier date, and the app shows them first. A finding's hash covers the fields the check watches (for AEs: term, dates, severity, seriousness, causality, outcome), so a worsened AE comes back for review and an edit to an unrelated field does not. The review queue holds clinical flags new or changed in the window, plus any reviewed flag whose data has changed since.
 
@@ -204,11 +249,31 @@ Checks are registered, not hard-coded. Each check is metadata plus one function,
 
 A study without a check spec can still list its checks in study.yml (`checks`), and a study can register its own check types in a study folder, without touching the package.
 
+**Patient lists.** A Patient lists sheet in the check spec defines the standard lists for patient review, one row per list: ID, name, area, and either conditions over a form (`AE: AETOXGR in 3, 4`) or the check IDs whose findings put a patient on it (`AE-SAE`, `DOSE-LOW`). Like checks, rows are retired, never deleted, and a list whose fields the study lacks shows as *not available* with the reason. Lists are computed in the core for each review date, so the same patient is on the same list in the app, the workbook and a PDF set. Reviewers can also filter patients ad hoc in the app and save a filter for themselves; saved filters live in the study database, not the spec.
+
 ## Display library
 
 Screens are built from generic Shiny modules that work off form types, configured per study in study.yml and filtered by the user's role in the core. Each module declares the form types and fields it needs, and the app only shows a screen when that data exists, so a study with no PK simply has no PK view.
 
-**Layout.** The app is organised around the review a reviewer has to get through, not around the order screens were built, and kept quiet: white ground, one blue for actions, colour only where it carries meaning. A sidebar lists every screen under a few headings, so any screen is one click away: My review and New and updated data at the top, then Subjects (subject list, visit status, full profile), Safety (adverse events, PK, dosing, clinical flags), Efficacy, Data quality (data checks, queries, coding), Operations (sites, lock readiness) and Close-out (sign-off, audit trail, data load). On a phone the sidebar folds away. Above every screen sit its title and one row of controls: review date, changes since, site, a subject search and the review workbook.
+**Layout.** The app is organised around the review a reviewer has to get through, not around the order screens were built, and kept quiet: one accent colour for actions, colour only where it carries meaning, few borders and no decorative cards. A sidebar lists every screen under a few headings, so any screen is one click away: Weekly review, Action items, My review and New and updated data at the top, then Study (overview, data cut history), Patients (patient review), Subjects (subject list, visit status, full profile), Safety (adverse events, PK, dosing, clinical flags), Efficacy, Data quality (data checks, queries, coding), Operations (sites, lock readiness) and Close-out (sign-off, audit trail, data load). The sidebar folds to a narrow rail with a menu button, and is folded by default during the meeting. The screen the app opens on is set in study.yml (`home`); the weekly workflow opens on Weekly review.
+
+**Context bar.** One bar above every screen holds the review context, shared by all screens, as in teal's filter panel: the cut, a *changes since the previous cut only* switch (on by default in the meeting), the active filters as removable chips (site, subject, saved patient list) and the count they leave ("14 of 60 patients"), plus a subject search and the review workbook. Screens do not carry their own copies of these controls.
+
+**Start collapsed.** Every screen opens at the high level: a list of collapsed rows, each a one-line summary with a count and a flag (for example "Dosing · 1 red · 2 amber · worst: site 113, 3 of 4 below 80%"). Opening a row shows its detail; one row is open at a time, so a screen never shows everything at once. Records, patients and actions open in a side panel over the screen rather than a new page.
+
+**One flag rule.** Every check, site measure and patient list uses the same three flags, worked out the same way from the warning and action limits in the check spec, as in {gsm}: green within the warning limit, amber past it, red past the action limit. A flag is always shown with its word (and, as a user setting, a shape: ▲ red, ◆ amber, ● green) and with the numbers behind it, never by colour alone. Site comparisons plot each site by size against its value, over the amber and red bands, with a ranked list of the flagged sites beside the chart; bands that widen for small sites (a funnel plot) are the target.
+
+**Colour and type.** The default scheme is *Warm paper*: page #faf7f2, panels #f2ede4, lines #e6dfd3, text #2b2620, secondary text #635a4f, accent teal #0f5e57, flags red #a61b1b, amber #8f5200 and green #2f6b2f. High contrast, colour-blind safe (Okabe-Ito) and dark schemes are alternatives. Every text and flag colour in every scheme meets WCAG AA (4.5 to 1) on both page and panel backgrounds, and a test checks this. Schemes are bslib themes built from one set of tokens; scheme, text size (normal or large) and flag shapes are per-user settings kept in the review store. Type is IBM Plex Sans, with Plex Mono for IDs and values.
+
+**Weekly review** runs the meeting as an agenda checklist. It is tied to one cut and opens on *This week at a glance*: the agenda groups, collapsed, each with its summary and flag. The groups are, in order: open action items (overdue first) with their latest update, items closed since the previous meeting, then new and updated data, check findings by area, and patient lists. Each agenda item has a tick box; selecting it shows its key facts, a note for the minutes, **Discussed, next** and **+ Action**, and a link to its screen. Raising an action from here, or from any record, finding, patient or site on any screen, links it to the meeting. The meeting keeps its attendees and minutes, and exports minutes and the action log to Excel for the study file.
+
+**Action items** is the full action log, grouped and collapsed like an issue tracker's saved views (overdue, due in the next 7 days, due later, closed since the last meeting): one line per item with its owner, due date, status and what it is attached to. An item opens in a side panel with its history of updates, an update box and, for the owner, **Close action**. Filters by owner, status, area or site come from the context bar.
+
+**Study overview** shows the study as a whole on the review date: key counts (enrolled, dosed, visits, AEs and SAEs, open queries, open findings) with what is new since the previous cut, and a *needs attention* list counting findings by area, each linking to its screen. The site scorecard compares sites on the same areas: conduct (visits, deviations), dosing compliance, safety (AE and SAE rates), efficacy and data entry and quality. Each measure is a collapsed row with its worst flag; opening it shows the site chart, the ranked flagged sites and the selected site's trend over recent cuts, with **+ Action for site**.
+
+**Patient review** has two parts. On the left, a patient list: one of the study's standard lists (patients with an SAE, a grade 3 or 4 AE, low compliance) or a filter the reviewer builds and saves. On the right, the selected patient: the graphic profile, then the patient's data by form with new and changed records marked. The **profile builder** starts from the study's template in study.yml (`profile`: panels such as exposure, AEs by grade, labs and efficacy on one time axis from first dose); a reviewer adds or removes panels and parameters and can save the layout. PDF profiles (version 2) use the same layouts.
+
+**Data cut history** compares any two cuts: a summary of each cut (date received, files, row counts by form, load problems), record differences by form (added, changed with values before and after, deleted), check findings new, still open or resolved, and trends across every cut (enrolled, visits, AEs and SAEs, open queries, findings, compliance).
 
 **New and updated data.** As in the 2017 review workbook, reviewers see the monitored data itself, not summaries of it. Every listing of a monitored form (study.yml `app: monitored`) colours each record by its status since the earlier date: new records blue, updated (corrected) records amber with each changed value in a deeper amber that shows the earlier value on hover, and records deleted in the window struck through. A switch shows all records or only new and updated ones. The **New and updated data** screen puts these listings for every monitored form with changes on one page, and the subject view and the review workbook use the same colours.
 
@@ -222,6 +287,11 @@ Screens are built from generic Shiny modules that work off form types, configure
 
 | Module | Works on | Shows |
 | --- | --- | --- |
+| Weekly review | Review store, all forms | The meeting for a cut: open and recently closed actions, then new and updated data and findings by area; attendees, minutes |
+| Action items | Review store | The action log by owner, status, area and site, with each item's history |
+| Study overview | All forms | Key counts and what is new since the previous cut, and findings needing attention by area |
+| Patient review | Patient lists, all forms | A standard or saved patient list beside the selected patient's graphic profile and data |
+| Data cut history | Cuts | Two cuts compared: summaries, record differences, findings, trends across cuts |
 | Review queue | All forms | My review: subjects with new data or open clinical flags in the window, progress, and the record and finding changes |
 | What's new | All forms | New, changed and deleted records since the last review, by priority |
 | Subject list | Subject data | Every subject with status, reference dates, review status and open items |
@@ -248,7 +318,11 @@ A study that needs something genuinely specific registers a **plug-in module** i
 
 ## Review state
 
-Review state is the record of sponsor oversight: who reviewed what, when and with what outcome. Review marks and sign-off are GxP electronic records, so they follow 21 CFR Part 11 and EU Annex 11; the 2017 workbook could only infer review from query status.
+Review state is the record of sponsor oversight: who reviewed what, when, with what outcome, and what was followed up. Whether review marks, action items and sign-off are the formal GxP record (21 CFR Part 11, EU Annex 11) or a working tool whose exports are filed is decided per sponsor (see Roadmap); either way the full audit trail is kept from the first meeting, since it cannot be added afterwards. The 2017 workbook could only infer review from query status.
+
+- **Study team list** of people who can own an action: name, role, email and an active flag. Owners need not have a login (a CRA or vendor contact); whoever records an update is logged as its author.
+- **Meetings**, one per cut: date, attendees from the team list, minutes, and the items raised or updated in it.
+- **Action items** on a record, a check finding, a patient, a site or the whole study: title, area, owner, due date, status (open, in progress, closed) and the meeting and cut where it was raised. Every change (a note, a new status, owner or due date) is an added update, never an edit, so an item's history is its list of updates. The owner closes an item with a note on what was done; the next meeting lists items closed since the previous one. Version 1 sends no email reminders.
 
 - **Review marks** on a record or a finding, with an optional comment and an outcome (no action, query raised in the EDC, escalated). A mark resets only when a field it depends on changes.
 - **Sign-off (version 1)** of a review cycle, for example the weekly medical review of an extract. It records name, UTC time, the meaning of the signature and a hash of the scope reviewed, after re-authentication through single sign-on.
@@ -281,15 +355,15 @@ Every data row carries the same status columns: record status (New, Changed, Del
 
 ## Pipeline, deployment and access
 
-**Batch pipeline, thin app.** A scheduled pipeline (built with the `targets` package) runs connectors, mapping, versioning and load-time checks, then writes the CDM and findings as parquet files per extract. The app only reads those files and computes as-of views. This keeps the app fast, makes the pipeline the thing that is validated, and lets the same results feed the workbook and profiles.
+**Batch pipeline, thin app.** A scheduled pipeline (built with the `targets` package) picks up each weekly cut from the secure drop folder, runs connectors, mapping, versioning and load-time checks, and writes the raw cut, the CDM and findings to the study database. The app only reads the database and computes as-of views. This keeps the app fast, makes the pipeline the thing that is validated, and lets the same results feed the workbook and profiles.
 
 **Extract intake.** Each extract arrives with a manifest of expected files, row counts and checksums. A run is quarantined, and the previous data stays live, if a file is missing, a form's row count drops by more than a configured share, or a required column disappears.
 
 **Run log and alerts.** Every run records its status, extract, package versions (pinned per study with renv) and hashes of the spec and config. The app and every export show "data as of" and the last successful run; a failed or quarantined run emails the study's data manager. One documented command reruns or backfills an extract.
 
-**Spec changes mid-study.** A mapping spec change triggers a deterministic rebuild of the version history from the stored extracts. Review marks carry over by finding key and field hash, so only records whose relevant values change need review again.
+**Spec changes mid-study.** A mapping spec change triggers a deterministic rebuild of the version history from the raw cuts in the database. Review marks carry over by finding key and field hash, so only records whose relevant values change need review again.
 
-**Refresh.** Nightly or weekly per study, set in study.yml. Each run keeps its extract folder, so any past review can be reproduced exactly.
+**Refresh.** Weekly by default, or nightly, set in study.yml. Every raw cut is kept in the database, so any past review can be reproduced exactly.
 
 **Multi-study.** One app instance serves all studies; a study selector picks the config folder. A later portfolio view compares operational metrics (enrollment, entry timeliness, open queries) across studies using only the standard header.
 
@@ -315,7 +389,7 @@ The package is tested in five layers, all run in continuous integration:
 
 ## Roadmap and open decisions
 
-**Version 1:** collected data model with record keys and crosswalk; Medrio and CSV/SAS connectors with extract intake checks; mapping spec compiler; as-of engine and change log; standard derivations; structural, cross-form, reconciliation and clinical checks; display modules (review queue with subject panel, what's new, subject list, visit status, over-time chart, event timeline, listing, site scorecard and site page, subject profile, check results, queries, coding review, lock readiness); review marks, sign-off and audit trail; role-scoped Excel workbook; run log, alerts and study archive; validation templates; a simulated example study and documentation site.
+**Version 1:** the weekly review cycle (study database with every cut stored, weekly review meeting, action items with owners from the study team list, study overview, patient review with patient lists and the profile builder, data cut history, readable labels); collected data model with record keys and crosswalk; connector registry and form contracts; Medrio and CSV/SAS connectors with extract intake checks; mapping spec compiler; as-of engine and change log; standard derivations; structural, cross-form, reconciliation and clinical checks; display modules (review queue with subject panel, what's new, subject list, visit status, over-time chart, event timeline, listing, site scorecard and site page, subject profile, check results, queries, coding review, lock readiness); review marks, sign-off and audit trail; role-scoped Excel workbook; run log, alerts and study archive; validation templates; a simulated example study and documentation site.
 
 **Version 2:** roles from the login, each with its own home queue and defaults; PDF patient profiles; CDISC ODM connector; SAE reconciliation with the safety database; weekly digest emails and risk indicators with thresholds (KRIs, QTLs); cross-study portfolio view; optional SDTM export, possibly through sdtm.oak.
 
@@ -327,6 +401,10 @@ The package is tested in five layers, all run in continuous integration:
 - [x] Review state storage, decided: both from version 1 through one database layer (DBI), chosen by `review_store` in study.yml. SQLite is the default for demos and single users; Postgres for team use, where several reviewers write at the same time. Remaining: who hosts Postgres (IT or a managed cloud database)
 - [x] License, decided: Apache 2.0 (permissive, with an explicit patent grant)
 - [ ] Project name: deferred, working name for now
+- [ ] Study database and hosting: Postgres is the design target behind the database layer; which server, who hosts it and who backs it up is open. SQLite serves demos and tests until then
+- [ ] Formal record or working tool: whether review marks, action items and sign-off are the inspected GxP record, or the app is a working tool whose signed exports are filed to the TMF. The full audit trail is kept either way; e-signatures on closing and sign-off depend on the answer
+- [ ] Data sources for the first study: not yet known; the connector registry and form contracts keep them changeable
+- [x] Look and layout, decided from mockups: agenda checklist for the meeting, every screen starting collapsed, shared context bar, side panels, one flag rule, Warm paper colours (see Display library)
 
 * [ ] Open-source governance: CONTRIBUTING and GOVERNANCE files, release channel (r-universe, then CRAN), pharmaverse alignment; no client or employer names in any public material
 
