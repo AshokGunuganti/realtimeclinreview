@@ -19,21 +19,7 @@ review_tables <- c("store_info", "review_mark", "signoff", "audit_trail", "acces
 #' @return A DBI connection with the schema in place.
 #' @export
 open_review_store <- function(config, base_dir = ".") {
-  driver <- if (is.null(config$driver)) "sqlite" else config$driver
-  con <- switch(driver,
-    sqlite = {
-      if (!requireNamespace("RSQLite", quietly = TRUE)) stop("The sqlite review store needs RSQLite.", call. = FALSE)
-      path <- config$path
-      if (is.null(path)) stop("review_store needs a path for sqlite.", call. = FALSE)
-      if (!grepl("^(/|[A-Za-z]:)", path) && path != ":memory:") path <- file.path(base_dir, path)
-      DBI::dbConnect(RSQLite::SQLite(), path)
-    },
-    postgres = {
-      if (!requireNamespace("RPostgres", quietly = TRUE)) stop("The postgres review store needs RPostgres.", call. = FALSE)
-      args <- config[intersect(names(config), c("dbname", "host", "port", "user", "password"))]
-      do.call(DBI::dbConnect, c(list(getExportedValue("RPostgres", "Postgres")()), args))
-    },
-    stop("review_store driver must be sqlite or postgres.", call. = FALSE))
+  con <- db_connect(config, base_dir, "review_store")
   init_review_store(con)
   con
 }
@@ -50,8 +36,7 @@ open_review_store <- function(config, base_dir = ".") {
 #' @return `con`, invisibly.
 #' @export
 init_review_store <- function(con) {
-  pg <- is_postgres(con)
-  id <- if (pg) "BIGSERIAL PRIMARY KEY" else "INTEGER PRIMARY KEY AUTOINCREMENT"
+  id <- id_column(con)
   ddl <- c(
     "CREATE TABLE IF NOT EXISTS store_info (KEY TEXT NOT NULL, VALUE TEXT NOT NULL, SET_AT TEXT NOT NULL)",
     paste0("CREATE TABLE IF NOT EXISTS review_mark (MARKID ", id, ", STUDYID TEXT NOT NULL, ",
@@ -66,29 +51,13 @@ init_review_store <- function(con) {
            "EVENT_AT TEXT NOT NULL)"),
     paste0("CREATE TABLE IF NOT EXISTS access_log (ACCESSID ", id, ", STUDYID TEXT NOT NULL, ",
            "ACTION TEXT NOT NULL, OBJECT TEXT NOT NULL, DETAIL TEXT, USERID TEXT NOT NULL, ACCESSED_AT TEXT NOT NULL)"),
-    "CREATE INDEX IF NOT EXISTS review_mark_target ON review_mark (STUDYID, TARGET_TYPE, TARGET_KEY)"
+    "CREATE INDEX IF NOT EXISTS review_mark_target ON review_mark (STUDYID, TARGET_TYPE, TARGET_KEY)",
+    append_only_ddl(review_tables, is_postgres(con))
   )
-  if (pg) {
-    ddl <- c(ddl, paste0(
-      "CREATE OR REPLACE FUNCTION rtcr_append_only() RETURNS trigger AS $$ BEGIN ",
-      "RAISE EXCEPTION '% is append-only', TG_TABLE_NAME; END; $$ LANGUAGE plpgsql"))
-    for (t in review_tables) {
-      ddl <- c(ddl, paste0("DROP TRIGGER IF EXISTS ", t, "_append_only ON ", t),
-               paste0("CREATE TRIGGER ", t, "_append_only BEFORE UPDATE OR DELETE ON ", t,
-                      " FOR EACH ROW EXECUTE FUNCTION rtcr_append_only()"))
-    }
-  } else {
-    for (t in review_tables) {
-      for (op in c("UPDATE", "DELETE")) {
-        ddl <- c(ddl, paste0("CREATE TRIGGER IF NOT EXISTS ", t, "_no_", tolower(op), " BEFORE ", op, " ON ", t,
-                             " BEGIN SELECT RAISE(ABORT, '", t, " is append-only'); END"))
-      }
-    }
-  }
-  for (s in ddl) DBI::dbExecute(con, s)
-  info <- DBI::dbGetQuery(con, "SELECT VALUE FROM store_info WHERE KEY = 'schema_version'")
+  for (s in ddl) db_exec(con, s)
+  info <- db_get(con, "SELECT VALUE FROM store_info WHERE KEY = 'schema_version'")
   if (!nrow(info)) {
-    DBI::dbAppendTable(con, "store_info", data.frame(KEY = "schema_version", VALUE = as.character(review_store_schema_version),
+    db_append(con, "store_info", data.frame(KEY = "schema_version", VALUE = as.character(review_store_schema_version),
                                                      SET_AT = utc_now(), stringsAsFactors = FALSE))
   } else if (as.integer(info$VALUE[nrow(info)]) != review_store_schema_version) {
     stop("Review store schema version ", info$VALUE[nrow(info)], " needs migrating to ", review_store_schema_version, ".",
@@ -147,7 +116,7 @@ write_mark <- function(con, study, target_type, target_key, user, action, outcom
       stop("There is no mark to clear.", call. = FALSE)
     }
     now <- utc_now()
-    DBI::dbAppendTable(con, "review_mark", data.frame(
+    db_append(con, "review_mark", data.frame(
       STUDYID = study, TARGET_TYPE = target_type, TARGET_KEY = target_key, SUBJID = subjid, ACTION = action,
       OUTCOME = outcome, COMMENT = comment, DEPHASH = dephash, VERSION = version, USERID = user, MARKED_AT = now,
       stringsAsFactors = FALSE))
@@ -160,7 +129,7 @@ write_mark <- function(con, study, target_type, target_key, user, action, outcom
 }
 
 latest_mark <- function(con, study, target_type, target_key) {
-  DBI::dbGetQuery(con, paste(
+  db_get(con, paste(
     "SELECT * FROM review_mark WHERE STUDYID = ? AND TARGET_TYPE = ? AND TARGET_KEY = ?",
     "ORDER BY MARKID DESC LIMIT 1"), params = list(study, target_type, target_key))
 }
@@ -178,7 +147,7 @@ current_marks <- function(con, study, target_type = NULL) {
     "SELECT m.* FROM review_mark m JOIN (SELECT TARGET_TYPE, TARGET_KEY, MAX(MARKID) AS MARKID FROM review_mark",
     "WHERE STUDYID = ? GROUP BY TARGET_TYPE, TARGET_KEY) last ON m.MARKID = last.MARKID",
     "WHERE m.ACTION = 'set'", if (!is.null(target_type)) "AND m.TARGET_TYPE = ?", "ORDER BY m.MARKID")
-  DBI::dbGetQuery(con, q, params = c(list(study), if (!is.null(target_type)) list(target_type)))
+  db_get(con, q, params = c(list(study), if (!is.null(target_type)) list(target_type)))
 }
 
 #' Attach review marks to findings or records
@@ -264,7 +233,7 @@ sign_off <- function(con, study, review_type, asof, scope, user, full_name, mean
   h <- scope_hash(scope)
   now <- utc_now()
   DBI::dbWithTransaction(con, {
-    DBI::dbAppendTable(con, "signoff", data.frame(
+    db_append(con, "signoff", data.frame(
       STUDYID = study, REVIEW_TYPE = review_type, ASOF = format(as.Date(asof)), SCOPE_HASH = h, SCOPE_N = nrow(scope),
       USERID = user, FULL_NAME = full_name, MEANING = meaning, AUTH_AT = utc_format(auth_at), SIGNED_AT = now,
       stringsAsFactors = FALSE))
@@ -302,7 +271,7 @@ signoffs <- function(con, study, review_type = NULL, user = NULL) {
   p <- list(study)
   if (!is.null(review_type)) { q <- paste(q, "AND REVIEW_TYPE = ?"); p <- c(p, review_type) }
   if (!is.null(user)) { q <- paste(q, "AND USERID = ?"); p <- c(p, user) }
-  DBI::dbGetQuery(con, paste(q, "ORDER BY SIGNOFFID DESC"), params = p)
+  db_get(con, paste(q, "ORDER BY SIGNOFFID DESC"), params = p)
 }
 
 #' Default "since" date for the change log
@@ -327,7 +296,7 @@ review_since <- function(con, study, review_type, user = NULL, fallback = NULL) 
 #' @return Rows in the order they were written.
 #' @export
 audit_trail <- function(con, study) {
-  DBI::dbGetQuery(con, "SELECT * FROM audit_trail WHERE STUDYID = ? ORDER BY AUDITID", params = list(study))
+  db_get(con, "SELECT * FROM audit_trail WHERE STUDYID = ? ORDER BY AUDITID", params = list(study))
 }
 
 #' @rdname audit_trail
@@ -338,7 +307,7 @@ audit_trail <- function(con, study) {
 log_access <- function(con, study, user, action, object, detail = NA_character_) {
   need_user(user)
   if (!action %in% c("view", "export")) stop("action must be view or export.", call. = FALSE)
-  DBI::dbAppendTable(con, "access_log", data.frame(STUDYID = study, ACTION = action, OBJECT = object, DETAIL = detail,
+  db_append(con, "access_log", data.frame(STUDYID = study, ACTION = action, OBJECT = object, DETAIL = detail,
                                                    USERID = user, ACCESSED_AT = utc_now(), stringsAsFactors = FALSE))
   invisible(NULL)
 }
@@ -346,7 +315,7 @@ log_access <- function(con, study, user, action, object, detail = NA_character_)
 #' @rdname audit_trail
 #' @export
 access_log <- function(con, study) {
-  DBI::dbGetQuery(con, "SELECT * FROM access_log WHERE STUDYID = ? ORDER BY ACCESSID", params = list(study))
+  db_get(con, "SELECT * FROM access_log WHERE STUDYID = ? ORDER BY ACCESSID", params = list(study))
 }
 
 #' Compare findings between two runs
@@ -369,7 +338,7 @@ compare_findings <- function(old, new) {
 # Helpers ----------------------------------------------------------------------------
 
 audit <- function(con, study, event, target, old, new, user, at) {
-  DBI::dbAppendTable(con, "audit_trail", data.frame(
+  db_append(con, "audit_trail", data.frame(
     STUDYID = study, EVENT = event, TARGET = target, OLD_VALUE = as.character(old), NEW_VALUE = as.character(new),
     USERID = user, EVENT_AT = at, stringsAsFactors = FALSE))
 }
@@ -385,8 +354,6 @@ need_user <- function(user) {
     stop("A user ID is required.", call. = FALSE)
   }
 }
-
-is_postgres <- function(con) inherits(con, "PqConnection")
 
 utc_format <- function(t) format(t, "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
 

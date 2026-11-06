@@ -355,7 +355,7 @@ Every data row carries the same status columns: record status (New, Changed, Del
 
 ## Pipeline, deployment and access
 
-**Batch pipeline, thin app.** A scheduled pipeline (built with the `targets` package) picks up each weekly cut from the secure drop folder, runs connectors, mapping, versioning and load-time checks, and writes the raw cut, the CDM and findings to the study database. The app only reads the database and computes as-of views. This keeps the app fast, makes the pipeline the thing that is validated, and lets the same results feed the workbook and profiles.
+**Batch pipeline, thin app.** A scheduled pipeline (built with the `targets` package) picks up each weekly cut from the secure drop folder, runs connectors, mapping, versioning and load-time checks, and writes the raw cut, the CDM and findings to the study database. The app only reads the database and computes as-of views. This keeps the app fast, makes the pipeline the thing that is validated, and lets the same results feed the workbook and profiles. Cut intake is in place: `study_db` in study.yml names the database and `inbox` the delivery folder; `run_pickup()` (run by the scheduler) checks each new cut folder (manifest present, every listed file delivered with its listed row count, the right study, every file the mapping reads), stores a passing cut's raw rows as delivered, records a failing cut as rejected with its problems, and skips a cut whose files match one already loaded. `load_study()` then reads the latest cut, or a named one, from the database.
 
 **Extract intake.** Each extract arrives with a manifest of expected files, row counts and checksums. A run is quarantined, and the previous data stays live, if a file is missing, a form's row count drops by more than a configured share, or a required column disappears.
 
@@ -404,6 +404,8 @@ The package is tested in five layers, all run in continuous integration:
 - [ ] Study database and hosting: Postgres is the design target behind the database layer; which server, who hosts it and who backs it up is open. SQLite serves demos and tests until then
 - [ ] Formal record or working tool: whether review marks, action items and sign-off are the inspected GxP record, or the app is a working tool whose signed exports are filed to the TMF. The full audit trail is kept either way; e-signatures on closing and sign-off depend on the answer
 - [ ] Data sources for the first study: not yet known; the connector registry and form contracts keep them changeable
+- [ ] Original cut files: the study database keeps every raw value as delivered (untrimmed text) with each file's checksum, but not the file bytes themselves. Whether the delivered files must also be archived (in the database or a write-once store) depends on the formal-record decision above
+- [ ] Postgres path: the cut and review stores share one query layer that translates names and placeholders for Postgres, and a test runs against a Postgres server when `RTCR_TEST_POSTGRES` is set; it has not yet been run against a real server
 - [x] Look and layout, decided from mockups: agenda checklist for the meeting, every screen starting collapsed, shared context bar, side panels, one flag rule, Warm paper colours (see Display library)
 
 * [ ] Open-source governance: CONTRIBUTING and GOVERNANCE files, release channel (r-universe, then CRAN), pharmaverse alignment; no client or employer names in any public material

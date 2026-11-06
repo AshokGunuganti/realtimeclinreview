@@ -9,20 +9,11 @@
 #' @return Named list of data frames, one per file.
 #' @export
 read_extract <- function(dir, mapping) {
-  files <- unique(c(
-    vapply(mapping$forms, `[[`, "", "source"),
-    unlist(lapply(mapping$forms, function(f) {
-      lapply(f$fields, function(e) if (identical(e$transform, "lookup")) e$args$table)
-    }))
-  ))
   out <- list()
-  for (fl in files) {
+  for (fl in mapping_files(mapping)) {
     path <- file.path(dir, fl)
     if (!file.exists(path)) stop("Source file missing from extract: ", fl, ".", call. = FALSE)
-    df <- utils::read.csv(path, colClasses = "character", na.strings = character(0),
-                          check.names = FALSE, stringsAsFactors = FALSE)
-    df[] <- lapply(df, function(v) { v <- trimws(v); v[v == ""] <- NA_character_; v })
-    out[[fl]] <- df
+    out[[fl]] <- read_text_csv(path)
   }
   out
 }
